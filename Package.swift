@@ -41,6 +41,11 @@ let package = Package(
             dependencies: ["DerFluisterer"],
             path: "Tools/TranscribeTestCLI"
         ),
+        .executableTarget(
+            name: "TextInsertTestCLI",
+            dependencies: ["DerFluisterer"],
+            path: "Tools/TextInsertTestCLI"
+        ),
         .testTarget(
             name: "DerFluistererTests",
             dependencies: ["DerFluisterer"]

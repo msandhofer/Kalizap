@@ -18,6 +18,9 @@ final class ModuleProtocolTests: XCTestCase {
         assertProtocolExists((any TextCorrecting).self)
         assertProtocolExists((any TextInserting).self)
         assertProtocolExists((any ActiveAppDetecting).self)
+        assertProtocolExists((any ClipboardManaging).self)
+        assertProtocolExists((any KeystrokeSimulating).self)
+        assertProtocolExists((any AccessibilityInserting).self)
         assertProtocolExists((any DictationStoring).self)
     }
 }

@@ -1,47 +1,63 @@
 import Foundation
 
-struct ActiveApp: Sendable {
-    let bundleIdentifier: String
-    let localizedName: String
+public struct ActiveApp: Sendable {
+    public let bundleIdentifier: String
+    public let localizedName: String
+
+    public init(bundleIdentifier: String, localizedName: String) {
+        self.bundleIdentifier = bundleIdentifier
+        self.localizedName = localizedName
+    }
 }
 
-enum InsertionMethod: Sendable {
+public enum InsertionMethod: Sendable, Equatable {
     case clipboard, accessibility
 }
 
-enum InsertionOutcome: Sendable {
+public enum InsertionOutcome: Sendable, Equatable {
     case inserted(method: InsertionMethod)
     case pendingInClipboard
 }
 
-struct InsertionResult: Sendable {
-    let outcome: InsertionOutcome
-    let targetApp: ActiveApp?
-    let clipboardRestored: Bool
+public struct InsertionResult: Sendable {
+    public let outcome: InsertionOutcome
+    public let targetApp: ActiveApp?
+    public let clipboardRestored: Bool
+
+    public init(outcome: InsertionOutcome, targetApp: ActiveApp?, clipboardRestored: Bool) {
+        self.outcome = outcome
+        self.targetApp = targetApp
+        self.clipboardRestored = clipboardRestored
+    }
 }
 
-struct ClipboardSnapshot: Sendable {
-    let data: Data?
+public struct ClipboardSnapshot: Sendable {
+    public let data: Data?
+
+    public init(data: Data?) {
+        self.data = data
+    }
 }
 
-protocol TextInserting: Sendable {
+public protocol TextInserting: Sendable {
     func insert(_ text: String) async -> InsertionResult
 }
 
-protocol ActiveAppDetecting: Sendable {
+public protocol ActiveAppDetecting: Sendable {
     func frontmostApp() -> ActiveApp?
 }
 
-protocol ClipboardManaging: Sendable {
+public protocol ClipboardManaging: Sendable {
     func backup() async throws -> ClipboardSnapshot
     func set(text: String) async throws
     func restore(from snapshot: ClipboardSnapshot) async throws
 }
 
-protocol KeystrokeSimulating: Sendable {
+public protocol KeystrokeSimulating: Sendable {
     func simulatePaste() async throws
 }
 
-protocol AccessibilityInserting: Sendable {
+public protocol AccessibilityInserting: Sendable {
+    func hasTextFieldFocus() -> Bool
     func insertViaAccessibility(text: String) async throws
 }

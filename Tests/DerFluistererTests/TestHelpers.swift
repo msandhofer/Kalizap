@@ -11,6 +11,74 @@ final class MockSoundBackend: SoundBackend, @unchecked Sendable {
     }
 }
 
+// MARK: - TextInserter Mocks
+
+final class MockClipboardManager: ClipboardManaging, @unchecked Sendable {
+    var backedUp = false
+    var restoredSnapshot: ClipboardSnapshot?
+    var setText: String?
+    var backupError: (any Error)?
+    var setError: (any Error)?
+    var restoreError: (any Error)?
+
+    func backup() async throws -> ClipboardSnapshot {
+        if let backupError { throw backupError }
+        backedUp = true
+        return ClipboardSnapshot(data: Data("original".utf8))
+    }
+
+    func set(text: String) async throws {
+        if let setError { throw setError }
+        setText = text
+    }
+
+    func restore(from snapshot: ClipboardSnapshot) async throws {
+        if let restoreError { throw restoreError }
+        restoredSnapshot = snapshot
+    }
+}
+
+final class MockKeystrokeSimulator: KeystrokeSimulating, @unchecked Sendable {
+    var pasteSimulated = false
+    var simulateError: (any Error)?
+
+    func simulatePaste() async throws {
+        if let simulateError { throw simulateError }
+        pasteSimulated = true
+    }
+}
+
+final class MockAccessibilityInserter: AccessibilityInserting, @unchecked Sendable {
+    var hasTextField: Bool
+    var insertedText: String?
+    var insertError: (any Error)?
+
+    init(hasTextField: Bool = true) {
+        self.hasTextField = hasTextField
+    }
+
+    func hasTextFieldFocus() -> Bool {
+        hasTextField
+    }
+
+    func insertViaAccessibility(text: String) async throws {
+        if let insertError { throw insertError }
+        insertedText = text
+    }
+}
+
+final class MockAppDetector: ActiveAppDetecting, @unchecked Sendable {
+    var app: ActiveApp?
+
+    init(app: ActiveApp? = nil) {
+        self.app = app
+    }
+
+    func frontmostApp() -> ActiveApp? {
+        app
+    }
+}
+
 // MARK: - Factory Helpers
 
 func makeTestChunk(
