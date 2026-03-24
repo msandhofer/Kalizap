@@ -1,6 +1,14 @@
 import Foundation
 @testable import DerFluisterer
 
+// MARK: - Sendable Test Helpers
+
+final class SendableBox<T>: @unchecked Sendable {
+    private(set) var value: T
+    init(_ value: T) { self.value = value }
+    func set(_ newValue: T) { value = newValue }
+}
+
 // MARK: - Shared Mocks
 
 final class MockSoundBackend: SoundBackend, @unchecked Sendable {
@@ -95,6 +103,14 @@ func makeTestChunk(
         duration: duration,
         level: level
     )
+}
+
+func makeTestTranscriptionResult(_ text: String) -> TranscriptionResult {
+    .final(FinalTranscription(
+        text: text,
+        segments: [],
+        processingTime: .milliseconds(100)
+    ))
 }
 
 func makeTestAudioStream(_ chunks: [AudioChunk]) -> AsyncStream<AudioChunk> {

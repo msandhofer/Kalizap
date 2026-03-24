@@ -46,6 +46,11 @@ let package = Package(
             dependencies: ["DerFluisterer"],
             path: "Tools/TextInsertTestCLI"
         ),
+        .executableTarget(
+            name: "CorrectorTestCLI",
+            dependencies: ["DerFluisterer"],
+            path: "Tools/CorrectorTestCLI"
+        ),
         .testTarget(
             name: "DerFluistererTests",
             dependencies: ["DerFluisterer"]

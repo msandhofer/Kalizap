@@ -14,13 +14,13 @@ public struct AnthropicAPIKeyValidator: APIKeyValidating {
     }
 
     public func validate(apiKey: String) async throws {
-        var request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
+        var request = URLRequest(url: AnthropicDefaults.apiURL)
         request.httpMethod = "POST"
-        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.setValue(apiKey, forHTTPHeaderField: AnthropicDefaults.Headers.apiKey)
+        request.setValue(AnthropicDefaults.apiVersion, forHTTPHeaderField: AnthropicDefaults.Headers.version)
+        request.setValue(AnthropicDefaults.Headers.contentType, forHTTPHeaderField: "content-type")
         request.httpBody = Data("""
-        {"model":"claude-haiku-4-5-20251001","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}
+        {"model":"\(AnthropicDefaults.model)","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}
         """.utf8)
 
         let (_, response) = try await session.data(for: request)
