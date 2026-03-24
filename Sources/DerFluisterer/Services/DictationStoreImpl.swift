@@ -1,11 +1,36 @@
 import Foundation
 import SwiftData
 
-@ModelActor
+public final class ChangeNotifier: Sendable {
+    public let stream: AsyncStream<Void>
+    private let continuation: AsyncStream<Void>.Continuation
+
+    public init() {
+        let (stream, continuation) = AsyncStream<Void>.makeStream()
+        self.stream = stream
+        self.continuation = continuation
+    }
+
+    public func notify() {
+        continuation.yield()
+    }
+}
+
 public actor DictationStoreImpl: DictationStoring {
 
     private static let newestFirst = [SortDescriptor(\DictationRecord.timestamp, order: .reverse)]
     private var historyLimit: Int = 100
+    private let changeNotifier: ChangeNotifier
+    private let modelContext: ModelContext
+
+    public nonisolated var didChange: AsyncStream<Void> { changeNotifier.stream }
+
+    public init(modelContainer: ModelContainer, changeNotifier: ChangeNotifier = ChangeNotifier()) {
+        self.changeNotifier = changeNotifier
+        let context = ModelContext(modelContainer)
+        context.autosaveEnabled = false
+        self.modelContext = context
+    }
 
     public func save(_ entry: DictationEntry) throws {
         let record = DictationRecord(
@@ -22,6 +47,7 @@ public actor DictationStoreImpl: DictationStoring {
         modelContext.insert(record)
         try modelContext.save()
         try trimToLimit()
+        changeNotifier.notify()
     }
 
     public func delete(id: UUID) throws {
@@ -30,6 +56,7 @@ public actor DictationStoreImpl: DictationStoring {
         if let record = try modelContext.fetch(descriptor).first {
             modelContext.delete(record)
             try modelContext.save()
+            changeNotifier.notify()
         }
     }
 

@@ -4,6 +4,7 @@ import DerFluisterer
 struct MainWindowView: View {
     @Bindable var settings: SettingsManager
     @Bindable var historyVM: HistoryViewModel
+    @Bindable var statisticsVM: StatisticsViewModel
 
     var body: some View {
         TabView {
@@ -13,22 +14,9 @@ struct MainWindowView: View {
             SettingsView(settings: settings)
                 .tabItem { Label("Einstellungen", systemImage: "gear") }
 
-            StatisticsPlaceholderView()
+            StatisticsView(viewModel: statisticsVM)
                 .tabItem { Label("Statistiken", systemImage: "chart.bar") }
         }
         .frame(width: 560, height: 480)
-    }
-}
-
-struct StatisticsPlaceholderView: View {
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "chart.bar")
-                .font(.largeTitle)
-                .foregroundStyle(.secondary)
-            Text("Statistiken kommen in Issue #11")
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

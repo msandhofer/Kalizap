@@ -9,6 +9,7 @@ public final class HistoryViewModel {
     public private(set) var copiedEntryID: UUID?
 
     private let store: any DictationStoring
+    private var observeTask: Task<Void, Never>?
 
     public init(store: any DictationStoring) {
         self.store = store
@@ -41,6 +42,22 @@ public final class HistoryViewModel {
                 copiedEntryID = nil
             }
         }
+    }
+
+    public func startObserving() async {
+        await loadEntries()
+        observeTask = Task { [weak self] in
+            guard let self else { return }
+            for await _ in self.store.didChange {
+                if Task.isCancelled { break }
+                await self.loadEntries()
+            }
+        }
+    }
+
+    public func stopObserving() {
+        observeTask?.cancel()
+        observeTask = nil
     }
 
     private func performSearch() async {

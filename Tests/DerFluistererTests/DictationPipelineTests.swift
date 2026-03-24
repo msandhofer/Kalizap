@@ -275,6 +275,7 @@ final class PipelineLevelMeteringMock: AudioLevelMetering, @unchecked Sendable {
 
 final class PipelineStoreMock: DictationStoring, @unchecked Sendable {
     var savedEntries: [DictationEntry] = []
+    let didChange: AsyncStream<Void> = AsyncStream { $0.finish() }
 
     func save(_ entry: DictationEntry) async throws {
         savedEntries.append(entry)

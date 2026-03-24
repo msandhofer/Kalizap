@@ -16,7 +16,7 @@ struct HistoryView: View {
             }
         }
         .task {
-            await viewModel.loadEntries()
+            await viewModel.startObserving()
         }
     }
 

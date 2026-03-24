@@ -11,11 +11,13 @@ struct DerFluistererApp: App {
     )
     @State private var recordingVM = RecordingViewModel()
     @State private var historyVM: HistoryViewModel
+    @State private var statisticsVM: StatisticsViewModel
 
     init() {
         let container = try! ModelContainer(for: DictationRecord.self)
         let store = DictationStoreImpl(modelContainer: container)
         _historyVM = State(initialValue: HistoryViewModel(store: store))
+        _statisticsVM = State(initialValue: StatisticsViewModel(store: store))
     }
 
     var body: some Scene {
@@ -25,7 +27,7 @@ struct DerFluistererApp: App {
         .menuBarExtraStyle(.window)
 
         Settings {
-            MainWindowView(settings: settings, historyVM: historyVM)
+            MainWindowView(settings: settings, historyVM: historyVM, statisticsVM: statisticsVM)
         }
     }
 
