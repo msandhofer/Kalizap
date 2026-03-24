@@ -274,15 +274,19 @@ final class PipelineLevelMeteringMock: AudioLevelMetering, @unchecked Sendable {
 }
 
 final class PipelineStoreMock: DictationStoring, @unchecked Sendable {
-    var savedRecords: [DictationRecord] = []
+    var savedEntries: [DictationEntry] = []
 
-    func save(_ record: DictationRecord) throws {
-        savedRecords.append(record)
+    func save(_ entry: DictationEntry) async throws {
+        savedEntries.append(entry)
     }
 
-    func delete(_ record: DictationRecord) throws {}
+    func delete(id: UUID) async throws {}
 
-    func statistics() -> DictationStatistics {
+    func fetchAll() async throws -> [DictationEntry] { savedEntries }
+
+    func search(query: String) async throws -> [DictationEntry] { [] }
+
+    func statistics() async -> DictationStatistics {
         DictationStatistics(
             totalCount: 0, todayCount: 0, weekCount: 0,
             totalWords: 0, averageWPM: 0, currentStreakDays: 0,
@@ -290,7 +294,7 @@ final class PipelineStoreMock: DictationStoring, @unchecked Sendable {
         )
     }
 
-    func updateHistoryLimit(_ limit: Int) throws {}
+    func updateHistoryLimit(_ limit: Int) async throws {}
 }
 
 // MARK: - Tests
@@ -385,7 +389,7 @@ struct DictationPipelineTests {
         await simulateDictation(hotkey: hotkey)
 
         #expect(inserter.insertedText == "Hallo Welt")
-        #expect(store.savedRecords.count == 1)
+        #expect(store.savedEntries.count == 1)
         #expect(pipeline.state == .idle)
 
         tearDown(hotkey: hotkey, task: task)
@@ -487,8 +491,8 @@ struct DictationPipelineTests {
         let task = await activatePipeline(pipeline)
         await simulateDictation(hotkey: hotkey)
 
-        #expect(store.savedRecords.count == 1)
-        let record = store.savedRecords[0]
+        #expect(store.savedEntries.count == 1)
+        let record = store.savedEntries[0]
         #expect(record.rawTranscript == "rohes transkript")
         #expect(record.correctedText == "Korrigiertes Transkript")
         #expect(record.language == "de")
@@ -665,7 +669,7 @@ struct DictationPipelineTests {
         try? await Task.sleep(for: .milliseconds(800))
 
         #expect(insertedTexts.count == 2)
-        #expect(store.savedRecords.count == 2)
+        #expect(store.savedEntries.count == 2)
         #expect(pipeline.state == .idle)
 
         tearDown(hotkey: hotkey, task: task)
@@ -884,7 +888,7 @@ struct DictationPipelineTests {
 
         // No text inserted, no record saved — processing was skipped
         #expect(inserter.insertedText == nil)
-        #expect(store.savedRecords.isEmpty)
+        #expect(store.savedEntries.isEmpty)
         #expect(pipeline.state == .idle)
 
         tearDown(hotkey: hotkey, task: task)

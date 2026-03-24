@@ -1,10 +1,12 @@
 import XCTest
 @testable import DerFluisterer
 
-final class DictationRecordTests: XCTestCase {
+final class DictationEntryTests: XCTestCase {
 
     func testWordCountCalculation() {
-        let record = DictationRecord(
+        let entry = DictationEntry(
+            id: UUID(),
+            timestamp: Date(),
             rawTranscript: "das ist ein test",
             correctedText: "Das ist ein Test.",
             language: "de",
@@ -14,11 +16,13 @@ final class DictationRecordTests: XCTestCase {
             processingTimeMs: 450
         )
 
-        XCTAssertEqual(record.wordCount, 4)
+        XCTAssertEqual(entry.wordCount, 4)
     }
 
     func testWordCountEmptyText() {
-        let record = DictationRecord(
+        let entry = DictationEntry(
+            id: UUID(),
+            timestamp: Date(),
             rawTranscript: "",
             correctedText: "",
             language: "de",
@@ -28,11 +32,13 @@ final class DictationRecordTests: XCTestCase {
             processingTimeMs: 0
         )
 
-        XCTAssertEqual(record.wordCount, 0)
+        XCTAssertEqual(entry.wordCount, 0)
     }
 
     func testWordsPerMinuteCalculation() {
-        let record = DictationRecord(
+        let entry = DictationEntry(
+            id: UUID(),
+            timestamp: Date(),
             rawTranscript: "test",
             correctedText: "Hier sind sechs einzelne Wörter drin",
             language: "de",
@@ -43,11 +49,13 @@ final class DictationRecordTests: XCTestCase {
         )
 
         // 6 Wörter / 0.5 Minuten = 12 WPM
-        XCTAssertEqual(record.wordsPerMinute, 12.0, accuracy: 0.01)
+        XCTAssertEqual(entry.wordsPerMinute, 12.0, accuracy: 0.01)
     }
 
     func testWordsPerMinuteZeroDuration() {
-        let record = DictationRecord(
+        let entry = DictationEntry(
+            id: UUID(),
+            timestamp: Date(),
             rawTranscript: "test",
             correctedText: "Sollte null ergeben",
             language: "de",
@@ -57,6 +65,6 @@ final class DictationRecordTests: XCTestCase {
             processingTimeMs: 0
         )
 
-        XCTAssertEqual(record.wordsPerMinute, 0)
+        XCTAssertEqual(entry.wordsPerMinute, 0)
     }
 }

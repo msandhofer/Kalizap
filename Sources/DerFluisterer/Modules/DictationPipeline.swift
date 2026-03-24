@@ -274,7 +274,9 @@ final class DictationPipeline {
         latencyMs = measuredLatencyMs
 
         // Persist
-        let record = DictationRecord(
+        let entry = DictationEntry(
+            id: UUID(),
+            timestamp: Date(),
             rawTranscript: rawText,
             correctedText: correctedText,
             language: job.language.rawValue,
@@ -283,7 +285,7 @@ final class DictationPipeline {
             durationMs: Int(job.buffer.totalDuration * 1000),
             processingTimeMs: measuredLatencyMs
         )
-        try? deps.store.save(record)
+        try? await deps.store.save(entry)
 
         if case .pendingInClipboard = insertionResult.outcome {
             updateStateIfNotRecording(.pendingInClipboard)

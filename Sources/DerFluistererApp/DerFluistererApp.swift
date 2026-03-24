@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import DerFluisterer
 
 @main
@@ -9,6 +10,13 @@ struct DerFluistererApp: App {
         launchAtLogin: LaunchAtLoginService()
     )
     @State private var recordingVM = RecordingViewModel()
+    @State private var historyVM: HistoryViewModel
+
+    init() {
+        let container = try! ModelContainer(for: DictationRecord.self)
+        let store = DictationStoreImpl(modelContainer: container)
+        _historyVM = State(initialValue: HistoryViewModel(store: store))
+    }
 
     var body: some Scene {
         MenuBarExtra("DerFlüsterer", systemImage: menuBarIcon) {
@@ -17,7 +25,7 @@ struct DerFluistererApp: App {
         .menuBarExtraStyle(.window)
 
         Settings {
-            SettingsView(settings: settings)
+            MainWindowView(settings: settings, historyVM: historyVM)
         }
     }
 
