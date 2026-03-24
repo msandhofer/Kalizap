@@ -1,0 +1,68 @@
+import Foundation
+
+final class HotkeyEventDispatcher: @unchecked Sendable {
+    private(set) var configuration: HotkeyConfiguration
+    var currentConfiguration: HotkeyConfiguration { configuration }
+    private var isRecording = false
+    private var isSuspended = false
+    private var continuation: AsyncStream<HotkeyEvent>.Continuation?
+
+    let events: AsyncStream<HotkeyEvent>
+
+    init(configuration: HotkeyConfiguration) {
+        self.configuration = configuration
+        var captured: AsyncStream<HotkeyEvent>.Continuation?
+        self.events = AsyncStream { continuation in
+            captured = continuation
+        }
+        self.continuation = captured
+    }
+
+    func suspend() {
+        isSuspended = true
+    }
+
+    func resume() {
+        isSuspended = false
+    }
+
+    func handleKeyDown(keyCode: UInt16) {
+        guard !isSuspended else { return }
+        guard keyCode == configuration.keyCode else { return }
+
+        if configuration.requiresHold {
+            guard !isRecording else { return } // ignore key repeat
+            isRecording = true
+            continuation?.yield(.recordingStarted)
+        } else {
+            // Toggle mode: each keyDown toggles state
+            if isRecording {
+                isRecording = false
+                continuation?.yield(.recordingStopped)
+            } else {
+                isRecording = true
+                continuation?.yield(.recordingStarted)
+            }
+        }
+    }
+
+    func handleKeyUp(keyCode: UInt16) {
+        guard !isSuspended else { return }
+        guard keyCode == configuration.keyCode else { return }
+
+        if configuration.requiresHold {
+            guard isRecording else { return }
+            isRecording = false
+            continuation?.yield(.recordingStopped)
+        }
+        // Toggle mode: keyUp is ignored
+    }
+
+    func updateConfiguration(_ newConfig: HotkeyConfiguration) {
+        configuration = newConfig
+    }
+
+    func finish() {
+        continuation?.finish()
+    }
+}

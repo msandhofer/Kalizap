@@ -1,25 +1,31 @@
 import Foundation
 
-struct HotkeyConfiguration: Sendable, Codable, Equatable {
-    var keyCode: UInt16
-    var modifierFlags: UInt64
-    var requiresHold: Bool
+public struct HotkeyConfiguration: Sendable, Codable, Equatable {
+    public var keyCode: UInt16
+    public var modifierFlags: UInt64
+    public var requiresHold: Bool
 
-    static let `default` = HotkeyConfiguration(
+    public static let `default` = HotkeyConfiguration(
         keyCode: 0x3D, modifierFlags: 0, requiresHold: true
     )
+
+    public init(keyCode: UInt16, modifierFlags: UInt64, requiresHold: Bool) {
+        self.keyCode = keyCode
+        self.modifierFlags = modifierFlags
+        self.requiresHold = requiresHold
+    }
 }
 
-enum HotkeyEvent: Sendable {
+public enum HotkeyEvent: Sendable, Equatable {
     case recordingStarted
     case recordingStopped
 }
 
-enum AccessibilityStatus: Sendable {
+public enum AccessibilityStatus: Sendable {
     case granted, denied, unknown
 }
 
-protocol HotkeyMonitoring: AnyObject, Sendable {
+public protocol HotkeyMonitoring: AnyObject, Sendable {
     var events: AsyncStream<HotkeyEvent> { get }
     var accessibilityStatus: AccessibilityStatus { get }
     var isHealthy: Bool { get }
@@ -29,13 +35,13 @@ protocol HotkeyMonitoring: AnyObject, Sendable {
     func resume()
 }
 
-protocol HotkeyConfiguring: AnyObject, Sendable {
+public protocol HotkeyConfiguring: AnyObject, Sendable {
     var currentConfiguration: HotkeyConfiguration { get }
     func updateConfiguration(_ configuration: HotkeyConfiguration)
     func captureNextKeyPress(timeout: Duration) async -> HotkeyConfiguration?
 }
 
-protocol AccessibilityChecking: Sendable {
+public protocol AccessibilityChecking: Sendable {
     func isAccessibilityGranted() -> Bool
     func requestAccessibility(prompt: Bool) -> Bool
 }
