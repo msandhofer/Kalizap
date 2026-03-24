@@ -1,8 +1,7 @@
 import Foundation
 
 final class HotkeyEventDispatcher: @unchecked Sendable {
-    private(set) var configuration: HotkeyConfiguration
-    var currentConfiguration: HotkeyConfiguration { configuration }
+    private(set) var currentConfiguration: HotkeyConfiguration
     private var isRecording = false
     private var isSuspended = false
     private var continuation: AsyncStream<HotkeyEvent>.Continuation?
@@ -10,7 +9,7 @@ final class HotkeyEventDispatcher: @unchecked Sendable {
     let events: AsyncStream<HotkeyEvent>
 
     init(configuration: HotkeyConfiguration) {
-        self.configuration = configuration
+        self.currentConfiguration = configuration
         var captured: AsyncStream<HotkeyEvent>.Continuation?
         self.events = AsyncStream { continuation in
             captured = continuation
@@ -28,9 +27,9 @@ final class HotkeyEventDispatcher: @unchecked Sendable {
 
     func handleKeyDown(keyCode: UInt16) {
         guard !isSuspended else { return }
-        guard keyCode == configuration.keyCode else { return }
+        guard keyCode == currentConfiguration.keyCode else { return }
 
-        if configuration.requiresHold {
+        if currentConfiguration.requiresHold {
             guard !isRecording else { return } // ignore key repeat
             isRecording = true
             continuation?.yield(.recordingStarted)
@@ -48,9 +47,9 @@ final class HotkeyEventDispatcher: @unchecked Sendable {
 
     func handleKeyUp(keyCode: UInt16) {
         guard !isSuspended else { return }
-        guard keyCode == configuration.keyCode else { return }
+        guard keyCode == currentConfiguration.keyCode else { return }
 
-        if configuration.requiresHold {
+        if currentConfiguration.requiresHold {
             guard isRecording else { return }
             isRecording = false
             continuation?.yield(.recordingStopped)
@@ -59,7 +58,7 @@ final class HotkeyEventDispatcher: @unchecked Sendable {
     }
 
     func updateConfiguration(_ newConfig: HotkeyConfiguration) {
-        configuration = newConfig
+        currentConfiguration = newConfig
     }
 
     func finish() {

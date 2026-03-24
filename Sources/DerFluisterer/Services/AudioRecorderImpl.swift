@@ -12,7 +12,7 @@ public final class AudioRecorderImpl: AudioRecording, @unchecked Sendable {
 
     // MARK: - AudioCapturing
 
-    public private(set) var state: AudioRecorderState = .idle
+    public var state: AudioRecorderState { coordinator.state }
 
     public var audioStream: AsyncThrowingStream<AudioChunk, Error> {
         coordinator.audioStream
@@ -50,20 +50,18 @@ public final class AudioRecorderImpl: AudioRecording, @unchecked Sendable {
 
     public func startRecording() async throws {
         try await coordinator.startRecording()
-        state = .recording
     }
 
     public func stopRecording() async {
         await coordinator.stopRecording()
-        state = .idle
     }
 
     public func startMetering() async {
-        // Metering is integrated into the tap — starts with recording
+        // No-op: metering is integrated into the audio tap and starts/stops with recording
     }
 
     public func stopMetering() async {
-        // Stops with recording
+        // No-op: see startMetering()
     }
 
     public func selectDevice(_ device: AudioDevice) async throws {

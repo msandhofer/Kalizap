@@ -1,0 +1,78 @@
+import Foundation
+import WhisperKit
+
+public final class WhisperKitBackend: WhisperBackend, @unchecked Sendable {
+    private var whisperKit: WhisperKit?
+    private let modelName: String
+
+    public init(model: String = "large-v3-turbo") {
+        self.modelName = model
+    }
+
+    public func loadModel(
+        for language: TranscriptionLanguage,
+        onProgress: @Sendable (Double) -> Void
+    ) async throws {
+        do {
+            let config = WhisperKitConfig(
+                model: modelName,
+                computeOptions: ModelComputeOptions(
+                    audioEncoderCompute: .cpuAndNeuralEngine,
+                    textDecoderCompute: .cpuAndNeuralEngine
+                ),
+                verbose: true,
+                logLevel: .debug
+            )
+            whisperKit = try await WhisperKit(config)
+            onProgress(1.0)
+        } catch {
+            throw TranscriptionError.modelLoadFailed(reason: error.localizedDescription)
+        }
+    }
+
+    public func transcribe(
+        samples: [Float],
+        language: String,
+        prompt: String
+    ) async throws -> WhisperTranscriptionResult {
+        guard let whisperKit else {
+            throw TranscriptionError.modelNotLoaded
+        }
+
+        do {
+            var options = DecodingOptions(
+                verbose: true,
+                language: language
+            )
+
+            if !prompt.isEmpty, let tokenizer = whisperKit.tokenizer {
+                options.promptTokens = tokenizer.encode(text: prompt)
+            }
+
+            let results = try await whisperKit.transcribe(
+                audioArrays: [samples],
+                decodeOptions: options
+            )
+
+            guard let firstGroup = results.first, let group = firstGroup, let first = group.first else {
+                throw TranscriptionError.batchFailed(reason: "No transcription result returned")
+            }
+
+            let text = first.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+
+            let segments = first.segments.map { segment in
+                TranscriptionSegment(
+                    text: segment.text,
+                    range: Duration.seconds(Double(segment.start))..<Duration.seconds(Double(segment.end)),
+                    confidence: segment.avgLogprob
+                )
+            }
+
+            return WhisperTranscriptionResult(text: text, segments: segments)
+        } catch let error as TranscriptionError {
+            throw error
+        } catch {
+            throw TranscriptionError.batchFailed(reason: error.localizedDescription)
+        }
+    }
+}

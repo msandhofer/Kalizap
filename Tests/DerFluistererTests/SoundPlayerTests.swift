@@ -2,18 +2,6 @@ import Testing
 import Foundation
 @testable import DerFluisterer
 
-// MARK: - Mock Sound Backend
-
-final class MockSoundBackend: SoundBackend, @unchecked Sendable {
-    var playedSounds: [SoundEffect] = []
-
-    func play(_ sound: SoundEffect) {
-        playedSounds.append(sound)
-    }
-}
-
-// MARK: - SoundPlayer Tests
-
 @Suite("SoundPlayer")
 struct SoundPlayerTests {
 

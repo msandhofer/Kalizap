@@ -1,46 +1,68 @@
 import Foundation
 
-struct TranscriptionConfig: Sendable {
-    var language: SupportedLanguage = .de
-    var initialPrompt: String = ""
+public struct TranscriptionConfig: Sendable {
+    public var language: SupportedLanguage = .de
+    public var initialPrompt: String = ""
+
+    public init(language: SupportedLanguage = .de, initialPrompt: String = "") {
+        self.language = language
+        self.initialPrompt = initialPrompt
+    }
 }
 
-struct PartialTranscription: Sendable {
-    let text: String
-    let confidence: Float
+public struct PartialTranscription: Sendable {
+    public let text: String
+    public let confidence: Float
+
+    public init(text: String, confidence: Float) {
+        self.text = text
+        self.confidence = confidence
+    }
 }
 
-struct FinalTranscription: Sendable {
-    let text: String
-    let segments: [TranscriptionSegment]
-    let processingTime: Duration
+public struct FinalTranscription: Sendable, Equatable {
+    public let text: String
+    public let segments: [TranscriptionSegment]
+    public let processingTime: Duration
+
+    public init(text: String, segments: [TranscriptionSegment], processingTime: Duration) {
+        self.text = text
+        self.segments = segments
+        self.processingTime = processingTime
+    }
 }
 
-struct TranscriptionSegment: Sendable {
-    let text: String
-    let range: Range<Duration>
-    let confidence: Float
+public struct TranscriptionSegment: Sendable, Equatable {
+    public let text: String
+    public let range: Range<Duration>
+    public let confidence: Float
+
+    public init(text: String, range: Range<Duration>, confidence: Float) {
+        self.text = text
+        self.range = range
+        self.confidence = confidence
+    }
 }
 
-enum TranscriptionResult: Sendable {
+public enum TranscriptionResult: Sendable {
     case partial(PartialTranscription)
     case final(FinalTranscription)
 }
 
-enum TranscriptionLanguage: String, Sendable {
+public enum TranscriptionLanguage: String, Sendable {
     case german = "de"
     case english = "en"
 }
 
-enum TranscriptionError: Error, Sendable {
+public enum TranscriptionError: Error, Sendable, Equatable {
     case modelNotLoaded
-    case modelLoadFailed(underlying: Error)
+    case modelLoadFailed(reason: String)
     case streamingFailed(reason: String)
     case batchFailed(reason: String)
     case cancelled
 }
 
-protocol TranscriptionEngine: Sendable {
+public protocol TranscriptionEngine: Sendable {
     func transcribe(
         _ audioChunks: AsyncStream<AudioChunk>,
         config: TranscriptionConfig

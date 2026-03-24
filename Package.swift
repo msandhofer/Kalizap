@@ -36,6 +36,11 @@ let package = Package(
             dependencies: ["DerFluisterer"],
             path: "Tools/AudioTestCLI"
         ),
+        .executableTarget(
+            name: "TranscribeTestCLI",
+            dependencies: ["DerFluisterer"],
+            path: "Tools/TranscribeTestCLI"
+        ),
         .testTarget(
             name: "DerFluistererTests",
             dependencies: ["DerFluisterer"]
