@@ -47,6 +47,13 @@ public struct TranscriptionSegment: Sendable, Equatable {
 public enum TranscriptionResult: Sendable {
     case partial(PartialTranscription)
     case final(FinalTranscription)
+
+    public var text: String {
+        switch self {
+        case .final(let ft): ft.text
+        case .partial(let pt): pt.text
+        }
+    }
 }
 
 public enum TranscriptionLanguage: String, Sendable {

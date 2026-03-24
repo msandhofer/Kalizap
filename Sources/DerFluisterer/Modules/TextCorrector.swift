@@ -20,6 +20,17 @@ public struct CorrectionConfig: Sendable {
         self.timeoutMs = timeoutMs
         self.maxRetries = maxRetries
     }
+
+    public init(from settings: CorrectionSettings, resolvedContextMode: ContextMode) {
+        self.contextMode = resolvedContextMode
+        self.intensity = CorrectionIntensity(
+            allowRephrasing: settings.allowRephrasing,
+            allowShortening: settings.allowShortening,
+            allowRestructuring: settings.allowRestructuring
+        )
+        self.personalDictionary = settings.personalDictionary
+        self.timeoutMs = settings.llmTimeoutMs
+    }
 }
 
 public struct CorrectionStats: Sendable {
@@ -44,6 +55,13 @@ public enum FallbackReason: Sendable {
 public enum CorrectionOutcome: Sendable {
     case corrected(text: String, stats: CorrectionStats)
     case fallbackRaw(text: String, reason: FallbackReason)
+
+    public var text: String {
+        switch self {
+        case .corrected(let text, _): text
+        case .fallbackRaw(let text, _): text
+        }
+    }
 }
 
 public struct DebugSnapshot: Sendable {
