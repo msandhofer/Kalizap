@@ -24,13 +24,18 @@ public struct HotkeySettings: Codable, Equatable {
 
 public struct CorrectionSettings: Codable, Equatable {
     public var contextMode: ContextMode = .neutral
-    public var appMapping: [String: ContextMode] = [:]
+    public var appMapping: [String: ContextMode] = CorrectionSettings.defaultAppMapping
     public var allowRephrasing: Bool = false
     public var allowShortening: Bool = false
     public var allowRestructuring: Bool = false
     public var personalDictionary: [String] = []
     public var llmTimeoutMs: Int = 800
-    public init(contextMode: ContextMode = .neutral, appMapping: [String: ContextMode] = [:], allowRephrasing: Bool = false, allowShortening: Bool = false, allowRestructuring: Bool = false, personalDictionary: [String] = [], llmTimeoutMs: Int = 800) {
+    public static let defaultAppMapping: [String: ContextMode] = [
+        "com.apple.mail": .formal,
+        "com.tinyspeck.slackmacgap": .informal,
+        "com.microsoft.Outlook": .formal
+    ]
+    public init(contextMode: ContextMode = .neutral, appMapping: [String: ContextMode] = CorrectionSettings.defaultAppMapping, allowRephrasing: Bool = false, allowShortening: Bool = false, allowRestructuring: Bool = false, personalDictionary: [String] = [], llmTimeoutMs: Int = 800) {
         self.contextMode = contextMode
         self.appMapping = appMapping
         self.allowRephrasing = allowRephrasing

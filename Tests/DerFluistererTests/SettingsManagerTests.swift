@@ -71,6 +71,13 @@ final class SettingsManagerDefaultsTests: XCTestCase {
         let sut = makeSettingsManager()
         XCTAssertEqual(sut.system, SystemSettings())
     }
+
+    func test_defaultAppMappings_arePreConfigured() {
+        let defaults = CorrectionSettings()
+        XCTAssertEqual(defaults.appMapping["com.apple.mail"], .formal)
+        XCTAssertEqual(defaults.appMapping["com.tinyspeck.slackmacgap"], .informal)
+        XCTAssertEqual(defaults.appMapping["com.microsoft.Outlook"], .formal)
+    }
 }
 
 // MARK: - Persistence

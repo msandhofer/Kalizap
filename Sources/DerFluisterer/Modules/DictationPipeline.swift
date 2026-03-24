@@ -301,11 +301,14 @@ final class DictationPipeline {
     }
 
     private func resolveContextMode(_ settings: CorrectionSettings) -> ContextMode {
+        guard settings.contextMode == .auto else {
+            return settings.contextMode
+        }
         if let app = deps.appDetector.frontmostApp(),
            let appMode = settings.appMapping[app.bundleIdentifier] {
             return appMode
         }
-        return settings.contextMode
+        return .neutral
     }
 
     private func transcribeBatch(buffer: CollectedAudioBuffer, language: SupportedLanguage) async -> TranscriptionResult? {

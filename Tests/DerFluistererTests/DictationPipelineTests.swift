@@ -611,9 +611,57 @@ struct DictationPipelineTests {
         tearDown(hotkey: hotkey, task: task)
     }
 
-    @Test("app-specific contextMode from appMapping overrides default")
+    @Test("auto mode: known app uses mapped contextMode")
     @MainActor
-    func appSpecificContextMode() async {
+    func autoModeKnownApp() async {
+        let hotkey = PipelineHotkeyMock()
+        let corrector = PipelineCorrectorMock()
+        let appDetector = MockAppDetector(
+            app: ActiveApp(bundleIdentifier: "com.apple.mail", localizedName: "Mail")
+        )
+        let settings = makeTestSettings()
+        settings.correction.contextMode = .auto
+        settings.correction.appMapping = ["com.apple.mail": .formal]
+
+        let pipeline = makeSUT(
+            hotkey: hotkey, corrector: corrector, appDetector: appDetector, settings: settings
+        )
+
+        let task = await activatePipeline(pipeline)
+        await simulateDictation(hotkey: hotkey)
+
+        #expect(corrector.lastConfig?.contextMode == .formal)
+
+        tearDown(hotkey: hotkey, task: task)
+    }
+
+    @Test("auto mode: unknown app defaults to neutral")
+    @MainActor
+    func autoModeUnknownApp() async {
+        let hotkey = PipelineHotkeyMock()
+        let corrector = PipelineCorrectorMock()
+        let appDetector = MockAppDetector(
+            app: ActiveApp(bundleIdentifier: "com.unknown.app", localizedName: "Unknown")
+        )
+        let settings = makeTestSettings()
+        settings.correction.contextMode = .auto
+        settings.correction.appMapping = ["com.apple.mail": .formal]
+
+        let pipeline = makeSUT(
+            hotkey: hotkey, corrector: corrector, appDetector: appDetector, settings: settings
+        )
+
+        let task = await activatePipeline(pipeline)
+        await simulateDictation(hotkey: hotkey)
+
+        #expect(corrector.lastConfig?.contextMode == .neutral)
+
+        tearDown(hotkey: hotkey, task: task)
+    }
+
+    @Test("non-auto mode: appMapping is ignored, selected mode is used")
+    @MainActor
+    func nonAutoModeIgnoresMapping() async {
         let hotkey = PipelineHotkeyMock()
         let corrector = PipelineCorrectorMock()
         let appDetector = MockAppDetector(
@@ -630,7 +678,7 @@ struct DictationPipelineTests {
         let task = await activatePipeline(pipeline)
         await simulateDictation(hotkey: hotkey)
 
-        #expect(corrector.lastConfig?.contextMode == .formal)
+        #expect(corrector.lastConfig?.contextMode == .informal)
 
         tearDown(hotkey: hotkey, task: task)
     }

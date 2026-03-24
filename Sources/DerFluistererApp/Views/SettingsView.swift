@@ -89,6 +89,8 @@ struct CorrectionSettingsSection: View {
             .pickerStyle(.segmented)
         }
 
+        AppMappingSection(settings: settings)
+
         Section("Korrektur-Intensität") {
             Toggle("Umformulieren erlaubt", isOn: $settings.correction.allowRephrasing)
             Toggle("Kürzen erlaubt", isOn: $settings.correction.allowShortening)
@@ -214,5 +216,70 @@ struct DictionarySettingsSection: View {
               !settings.correction.personalDictionary.contains(trimmed) else { return }
         settings.correction.personalDictionary.append(trimmed)
         newTerm = ""
+    }
+}
+
+// MARK: - App Mapping
+
+struct AppMappingSection: View {
+    @Bindable var settings: SettingsManager
+    @State private var newBundleID = ""
+    @State private var newMode: ContextMode = .formal
+
+    private var sortedMappings: [(key: String, value: ContextMode)] {
+        settings.correction.appMapping.sorted { $0.key < $1.key }
+    }
+
+    var body: some View {
+        Section("App-Zuordnung (Auto-Modus)") {
+            ForEach(sortedMappings, id: \.key) { bundleID, mode in
+                HStack {
+                    Text(bundleID)
+                        .font(.system(.body, design: .monospaced))
+                        .lineLimit(1)
+                    Spacer()
+                    ContextModePicker(label: "", selection: Binding(
+                        get: { mode },
+                        set: { settings.correction.appMapping[bundleID] = $0 }
+                    ))
+                    .frame(width: 130)
+                    Button(role: .destructive) {
+                        settings.correction.appMapping.removeValue(forKey: bundleID)
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+
+            HStack {
+                TextField("Bundle-ID (z.B. com.apple.Notes)", text: $newBundleID)
+                    .onSubmit { addMapping() }
+                ContextModePicker(label: "", selection: $newMode)
+                    .frame(width: 130)
+                Button("Hinzufügen") { addMapping() }
+                    .disabled(newBundleID.isEmpty)
+            }
+        }
+    }
+
+    private func addMapping() {
+        let trimmed = newBundleID.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        settings.correction.appMapping[trimmed] = newMode
+        newBundleID = ""
+    }
+}
+
+struct ContextModePicker: View {
+    let label: String
+    @Binding var selection: ContextMode
+
+    var body: some View {
+        Picker(label, selection: $selection) {
+            Text("Formell").tag(ContextMode.formal)
+            Text("Informell").tag(ContextMode.informal)
+            Text("Neutral").tag(ContextMode.neutral)
+        }
     }
 }
