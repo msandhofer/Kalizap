@@ -31,6 +31,11 @@ let package = Package(
             dependencies: ["DerFluisterer"],
             path: "Tools/HotkeyTestCLI"
         ),
+        .executableTarget(
+            name: "AudioTestCLI",
+            dependencies: ["DerFluisterer"],
+            path: "Tools/AudioTestCLI"
+        ),
         .testTarget(
             name: "DerFluistererTests",
             dependencies: ["DerFluisterer"]

@@ -3,12 +3,22 @@ import DerFluisterer
 
 struct MenuBarView: View {
     @Bindable var settings: SettingsManager
+    var recordingVM: RecordingViewModel
 
     var body: some View {
         VStack(spacing: 8) {
             Text("DerFlüsterer")
                 .font(.headline)
                 .padding(.top, 8)
+
+            if recordingVM.isRecording {
+                WaveformView(levels: recordingVM.waveformLevels)
+                    .padding(.horizontal, 8)
+
+                Text("Aufnahme läuft…")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
 
             apiKeyStatusView
 

@@ -1,54 +1,74 @@
 import Foundation
 
-struct AudioChunk: Sendable {
-    let samples: [Float]
-    let sampleRate: Int
-    let timestamp: TimeInterval
-    let duration: TimeInterval
-    let level: AudioLevel
+public struct AudioChunk: Sendable {
+    public let samples: [Float]
+    public let sampleRate: Int
+    public let timestamp: TimeInterval
+    public let duration: TimeInterval
+    public let level: AudioLevel
+
+    public init(samples: [Float], sampleRate: Int, timestamp: TimeInterval, duration: TimeInterval, level: AudioLevel) {
+        self.samples = samples
+        self.sampleRate = sampleRate
+        self.timestamp = timestamp
+        self.duration = duration
+        self.level = level
+    }
 }
 
-struct AudioLevel: Sendable {
-    let average: Float
-    let peak: Float
-    let timestamp: TimeInterval
+public struct AudioLevel: Sendable, Equatable {
+    public let average: Float
+    public let peak: Float
+    public let timestamp: TimeInterval
+
+    public init(average: Float, peak: Float, timestamp: TimeInterval) {
+        self.average = average
+        self.peak = peak
+        self.timestamp = timestamp
+    }
 }
 
-struct AudioDevice: Sendable, Identifiable, Hashable {
-    let id: String
-    let name: String
-    let isDefault: Bool
+public struct AudioDevice: Sendable, Identifiable, Hashable {
+    public let id: String
+    public let name: String
+    public let isDefault: Bool
+
+    public init(id: String, name: String, isDefault: Bool) {
+        self.id = id
+        self.name = name
+        self.isDefault = isDefault
+    }
 }
 
-enum AudioRecorderState: Sendable {
+public enum AudioRecorderState: Sendable, Equatable {
     case idle, recording, paused
 }
 
-enum AudioRecorderError: Error, Sendable {
+public enum AudioRecorderError: Error, Sendable {
     case microphoneAccessDenied
     case deviceNotFound(deviceID: String)
     case deviceLost
     case engineSetupFailed(underlying: Error)
 }
 
-protocol AudioCapturing: AnyObject, Sendable {
+public protocol AudioCapturing: AnyObject, Sendable {
     var audioStream: AsyncThrowingStream<AudioChunk, Error> { get }
     var state: AudioRecorderState { get }
     func startRecording() async throws
     func stopRecording() async
 }
 
-protocol AudioLevelMetering: AnyObject, Sendable {
+public protocol AudioLevelMetering: AnyObject, Sendable {
     var levelStream: AsyncStream<AudioLevel> { get }
     func startMetering() async
     func stopMetering() async
 }
 
-protocol AudioDeviceManaging: AnyObject, Sendable {
+public protocol AudioDeviceManaging: AnyObject, Sendable {
     var availableDevices: AsyncStream<[AudioDevice]> { get }
     var selectedDevice: AudioDevice? { get }
     func selectDevice(_ device: AudioDevice) async throws
     func selectDefaultDevice() async throws
 }
 
-protocol AudioRecording: AudioCapturing, AudioLevelMetering, AudioDeviceManaging {}
+public protocol AudioRecording: AudioCapturing, AudioLevelMetering, AudioDeviceManaging {}
