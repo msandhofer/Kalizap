@@ -1,32 +1,41 @@
 import Foundation
 
-enum SupportedLanguage: String, Codable, CaseIterable, Sendable {
+public enum SupportedLanguage: String, Codable, CaseIterable, Sendable {
     case de, en
 }
 
-enum ContextMode: String, Codable, CaseIterable, Sendable {
+public enum ContextMode: String, Codable, CaseIterable, Sendable {
     case formal, informal, neutral, auto
 }
 
-struct CorrectionIntensity: Codable, Equatable, Sendable {
-    var allowRephrasing: Bool = false
-    var allowShortening: Bool = false
-    var allowRestructuring: Bool = false
+public struct CorrectionIntensity: Codable, Equatable, Sendable {
+    public var allowRephrasing: Bool = false
+    public var allowShortening: Bool = false
+    public var allowRestructuring: Bool = false
+    public init(allowRephrasing: Bool = false, allowShortening: Bool = false, allowRestructuring: Bool = false) {
+        self.allowRephrasing = allowRephrasing
+        self.allowShortening = allowShortening
+        self.allowRestructuring = allowRestructuring
+    }
 }
 
-enum PipelineState: Equatable, Sendable {
+public enum PipelineState: Equatable, Sendable {
     case idle
     case recording
     case processing(stage: ProcessingStage)
     case pendingInClipboard
     case error(PipelineError)
 
-    enum ProcessingStage: String, Sendable {
+    public enum ProcessingStage: String, Sendable {
         case transcribing, correcting, inserting
     }
 }
 
-struct PipelineError: Equatable, Sendable {
-    let message: String
-    let isRecoverable: Bool
+public struct PipelineError: Equatable, Sendable {
+    public let message: String
+    public let isRecoverable: Bool
+    public init(message: String, isRecoverable: Bool) {
+        self.message = message
+        self.isRecoverable = isRecoverable
+    }
 }
