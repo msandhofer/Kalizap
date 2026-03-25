@@ -5,7 +5,7 @@ public final class WhisperKitBackend: WhisperBackend, @unchecked Sendable {
     private var whisperKit: WhisperKit?
     private let modelName: String
 
-    public init(model: String = "large-v3-turbo") {
+    public init(model: String = "openai_whisper-large-v3_turbo") {
         self.modelName = model
     }
 
