@@ -75,6 +75,13 @@ public struct UpdateSettings: Codable, Equatable {
         self.silentAutoUpdate = silentAutoUpdate
         self.lastSuccessfulUpdateCheck = lastSuccessfulUpdateCheck
     }
+
+    public var feedUnreachableWarning: String? {
+        guard let lastCheck = lastSuccessfulUpdateCheck else { return nil }
+        let daysSinceLastCheck = Calendar.current.dateComponents([.day], from: lastCheck, to: Date()).day ?? 0
+        guard daysSinceLastCheck >= 30 else { return nil }
+        return "Auto-Update-Server seit \(daysSinceLastCheck) Tagen nicht erreichbar"
+    }
 }
 
 public struct SystemSettings: Codable, Equatable {
@@ -140,7 +147,7 @@ public final class SettingsManager {
         self.update = Self.load(from: defaults, forKey: "update") ?? UpdateSettings()
     }
 
-    private static let apiKeyAccount = "anthropic-api-key"
+    nonisolated private static let apiKeyAccount = "anthropic-api-key"
 
     public func setAPIKey(_ key: String) throws {
         try keychain.store(key, for: Self.apiKeyAccount)
@@ -151,7 +158,7 @@ public final class SettingsManager {
     }
 
     nonisolated public func resolveAPIKeySendable() throws -> String {
-        try keychain.retrieve(for: "anthropic-api-key")
+        try keychain.retrieve(for: Self.apiKeyAccount)
     }
 
     public func deleteAPIKey() throws {
@@ -169,10 +176,7 @@ public final class SettingsManager {
     }
 
     public var feedUnreachableWarning: String? {
-        guard let lastCheck = update.lastSuccessfulUpdateCheck else { return nil }
-        let daysSinceLastCheck = Calendar.current.dateComponents([.day], from: lastCheck, to: Date()).day ?? 0
-        guard daysSinceLastCheck >= 30 else { return nil }
-        return "Auto-Update-Server seit \(daysSinceLastCheck) Tagen nicht erreichbar"
+        update.feedUnreachableWarning
     }
 
     public func validateAPIKey() async {

@@ -9,7 +9,7 @@ public protocol SoundBackend: Sendable {
     func play(_ sound: SoundEffect)
 }
 
-public final class SoundPlayer: @unchecked Sendable {
+public final class SoundPlayer: SoundPlaying, @unchecked Sendable {
     private let backend: SoundBackend
     public var soundsEnabled: Bool
 
@@ -17,6 +17,20 @@ public final class SoundPlayer: @unchecked Sendable {
         self.backend = backend
         self.soundsEnabled = soundsEnabled
     }
+
+    // MARK: - SoundPlaying (async, used by DictationPipeline)
+
+    public func playStartSound() async {
+        guard soundsEnabled else { return }
+        backend.play(.recordingStarted)
+    }
+
+    public func playStopSound() async {
+        guard soundsEnabled else { return }
+        backend.play(.recordingStopped)
+    }
+
+    // MARK: - Synchronous (used by RecordingCoordinator)
 
     public func playRecordingStarted() {
         guard soundsEnabled else { return }
@@ -26,15 +40,5 @@ public final class SoundPlayer: @unchecked Sendable {
     public func playRecordingStopped() {
         guard soundsEnabled else { return }
         backend.play(.recordingStopped)
-    }
-}
-
-extension SoundPlayer: SoundPlaying {
-    public func playStartSound() async {
-        playRecordingStarted()
-    }
-
-    public func playStopSound() async {
-        playRecordingStopped()
     }
 }

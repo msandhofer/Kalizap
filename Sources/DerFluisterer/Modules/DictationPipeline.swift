@@ -7,11 +7,6 @@ extension ContinuousClock.Instant {
     }
 }
 
-public protocol SoundPlaying: Sendable {
-    func playStartSound() async
-    func playStopSound() async
-}
-
 public struct PipelineDependencies {
     public let hotkey: any HotkeyMonitoring
     public let recorder: any AudioCapturing

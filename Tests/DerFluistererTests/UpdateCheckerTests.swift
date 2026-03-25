@@ -1,25 +1,35 @@
 import XCTest
 @testable import DerFluisterer
 
-@MainActor
-final class UpdateCheckerTests: XCTestCase {
+// MARK: - UpdateSettings
+
+final class UpdateSettingsTests: XCTestCase {
 
     func test_feedUnreachableWarning_nilWhenNeverChecked() {
-        let sut = makeSettingsManager()
-        XCTAssertNil(sut.update.lastSuccessfulUpdateCheck)
+        let sut = UpdateSettings()
         XCTAssertNil(sut.feedUnreachableWarning)
     }
 
     func test_feedUnreachableWarning_nilWhenRecentlyChecked() {
-        let sut = makeSettingsManager()
-        sut.update.lastSuccessfulUpdateCheck = Date()
+        let sut = UpdateSettings(lastSuccessfulUpdateCheck: Date())
         XCTAssertNil(sut.feedUnreachableWarning)
     }
 
     func test_feedUnreachableWarning_showsAfter30Days() {
+        let sut = UpdateSettings(lastSuccessfulUpdateCheck: Date(timeIntervalSinceNow: -31 * 24 * 3600))
+        XCTAssertNotNil(sut.feedUnreachableWarning)
+    }
+}
+
+// MARK: - SettingsManager delegates feedUnreachableWarning
+
+@MainActor
+final class UpdateSettingsIntegrationTests: XCTestCase {
+
+    func test_settingsManager_delegatesFeedWarningToUpdateSettings() {
         let sut = makeSettingsManager()
         sut.update.lastSuccessfulUpdateCheck = Date(timeIntervalSinceNow: -31 * 24 * 3600)
-        XCTAssertNotNil(sut.feedUnreachableWarning)
+        XCTAssertEqual(sut.feedUnreachableWarning, sut.update.feedUnreachableWarning)
     }
 }
 
