@@ -46,7 +46,7 @@ struct GeneralSettingsSection: View {
 
             Toggle("Halten zum Aufnehmen", isOn: $settings.hotkey.requiresHold)
 
-            Text("Änderung wird nach Neustart der App wirksam.")
+            Text("Hotkey-Änderung wird nach Neustart der App wirksam.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -129,7 +129,7 @@ struct AudioSettingsSection: View {
                     Text(model.displayName).tag(model)
                 }
             }
-            Text("Änderung wird nach Neustart der App wirksam.")
+            Text("Modell wird nach Auswahl automatisch neu geladen.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

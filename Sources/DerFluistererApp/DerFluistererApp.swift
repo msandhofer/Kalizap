@@ -36,12 +36,22 @@ struct DerFluistererApp: App {
                     guard pipeline == nil else { return }
                     await startPipeline()
                 }
+                .onChange(of: settings.audio.whisperModel) {
+                    Task { await restartPipeline() }
+                }
         }
         .menuBarExtraStyle(.window)
 
         Settings {
             MainWindowView(settings: settings, historyVM: historyVM, statisticsVM: statisticsVM)
         }
+    }
+
+    @MainActor
+    private func restartPipeline() async {
+        pipeline?.deactivate()
+        pipeline = nil
+        await startPipeline()
     }
 
     @MainActor
