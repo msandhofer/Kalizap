@@ -16,6 +16,17 @@ public enum WhisperModel: String, Codable, CaseIterable, Sendable {
         case .largeV3Turbo: "Large v3 Turbo (~950 MB)"
         }
     }
+
+    /// Estimated time in seconds for first-time model download + load.
+    public var estimatedLoadTimeSeconds: Double {
+        switch self {
+        case .tiny: 60
+        case .base: 120
+        case .small: 240
+        case .largeV3: 600
+        case .largeV3Turbo: 480
+        }
+    }
 }
 
 public struct AudioSettings: Codable, Equatable {

@@ -99,13 +99,25 @@ public final class DictationPipeline {
     public func loadModelAndActivate() async {
         let language = TranscriptionLanguage(rawValue: deps.settings.audio.language.rawValue) ?? .german
         state = .loadingModel(progress: 0)
-        do {
-            try await deps.transcriber.loadModel(for: language) { [weak self] progress in
-                Task { @MainActor in
-                    self?.state = .loadingModel(progress: progress)
-                }
+
+        let estimatedDuration = Duration.seconds(deps.settings.audio.whisperModel.estimatedLoadTimeSeconds)
+        let simulated = SimulatedProgress(estimatedDuration: estimatedDuration)
+
+        let progressTask = Task { [weak self] in
+            for await progress in simulated.values {
+                await MainActor.run { self?.state = .loadingModel(progress: progress) }
             }
+        }
+
+        do {
+            try await deps.transcriber.loadModel(for: language) { _ in
+                // Real progress ignored — using simulated progress instead
+            }
+            simulated.complete()
+            await progressTask.value
         } catch {
+            simulated.complete()
+            progressTask.cancel()
             state = .error(PipelineError(message: "Modell konnte nicht geladen werden: \(error.localizedDescription)", isRecoverable: true))
             return
         }
