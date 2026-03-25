@@ -85,11 +85,22 @@ struct UpdateSettingsSection: View {
 
 struct AudioSettingsSection: View {
     @Bindable var settings: SettingsManager
+    @State private var devices: [AudioDevice] = []
 
     var body: some View {
         Section("Mikrofon") {
-            Text("Mikrofon-Auswahl kommt in Issue #5")
-                .foregroundStyle(.secondary)
+            Picker("Eingabegerät", selection: Binding(
+                get: { settings.audio.microphoneID ?? "" },
+                set: { settings.audio.microphoneID = $0.isEmpty ? nil : $0 }
+            )) {
+                Text("System-Standard").tag("")
+                ForEach(devices) { device in
+                    Text(device.name).tag(device.id)
+                }
+            }
+            .onAppear {
+                devices = CoreAudioDeviceProvider().listDevices()
+            }
         }
 
         Section("Whisper-Modell") {
