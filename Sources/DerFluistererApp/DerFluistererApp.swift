@@ -26,7 +26,7 @@ struct DerFluistererApp: App {
 
     var body: some Scene {
         MenuBarExtra("DerFlüsterer", systemImage: menuBarIcon) {
-            MenuBarView(settings: settings, pipeline: pipeline, updater: updater)
+            MenuBarView(settings: settings, pipeline: pipeline, updater: updater, historyVM: historyVM)
                 .task {
                     if updater == nil {
                         let u = SparkleUpdater(settings: settings)

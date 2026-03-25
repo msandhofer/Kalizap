@@ -5,6 +5,7 @@ struct MenuBarView: View {
     @Bindable var settings: SettingsManager
     var pipeline: DictationPipeline?
     var updater: SparkleUpdater?
+    var historyVM: HistoryViewModel
 
     var body: some View {
         VStack(spacing: 8) {
@@ -15,6 +16,8 @@ struct MenuBarView: View {
             pipelineStatusView
 
             apiKeyStatusView
+
+            recentTranscriptionsView
 
             Divider()
 
@@ -36,6 +39,7 @@ struct MenuBarView: View {
         .padding(8)
         .task {
             await settings.validateAPIKey()
+            await historyVM.startObserving()
         }
     }
 
@@ -118,6 +122,38 @@ struct MenuBarView: View {
             Label("API-Key ungültig: \(message)", systemImage: "xmark.circle.fill")
                 .foregroundStyle(.red)
                 .font(.caption)
+        }
+    }
+
+    @ViewBuilder
+    private var recentTranscriptionsView: some View {
+        let recent = Array(historyVM.entries.prefix(3))
+        if !recent.isEmpty {
+            Divider()
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(recent, id: \.id) { entry in
+                    Button {
+                        historyVM.copyToClipboard(entry)
+                    } label: {
+                        ZStack {
+                            Text(entry.correctedText)
+                                .font(.caption)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .opacity(historyVM.copiedEntryID == entry.id ? 0 : 1)
+
+                            if historyVM.copiedEntryID == entry.id {
+                                Text("Kopiert!")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(.green)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
     }
 }
