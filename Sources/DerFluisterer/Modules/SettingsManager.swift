@@ -55,21 +55,38 @@ public struct HotkeySettings: Codable, Equatable {
     public var displayName: String {
         HotkeyDisplayNames.name(forKeyCode: keyCode)
     }
+
+    public var configuration: HotkeyConfiguration {
+        HotkeyConfiguration(keyCode: keyCode, modifierFlags: modifierFlags, requiresHold: requiresHold)
+    }
 }
 
 public enum HotkeyDisplayNames {
-    private static let keyNames: [UInt16: String] = [
-        0x38: "Left Shift", 0x3C: "Right Shift",
-        0x3B: "Left Control", 0x3E: "Right Control",
-        0x3A: "Left Option", 0x3D: "Right Option",
-        0x37: "Left Command", 0x36: "Right Command",
-        0x39: "Caps Lock", 0x30: "Tab",
-        0x31: "Space", 0x24: "Return", 0x33: "Delete",
-        0x35: "Escape", 0x7A: "F1", 0x78: "F2",
-        0x63: "F3", 0x76: "F4", 0x60: "F5",
-        0x61: "F6", 0x62: "F7", 0x64: "F8",
-        0x65: "F9", 0x6D: "F10", 0x67: "F11", 0x6F: "F12",
+    public static let selectableKeys: [(name: String, keyCode: UInt16)] = [
+        ("Right Option", 0x3D),
+        ("Left Option", 0x3A),
+        ("Right Command", 0x36),
+        ("Right Shift", 0x3C),
+        ("Right Control", 0x3E),
+        ("F5", 0x60),
+        ("F6", 0x61),
     ]
+
+    private static let keyNames: [UInt16: String] = {
+        var map: [UInt16: String] = [
+            0x38: "Left Shift", 0x3B: "Left Control",
+            0x37: "Left Command", 0x39: "Caps Lock",
+            0x30: "Tab", 0x31: "Space", 0x24: "Return",
+            0x33: "Delete", 0x35: "Escape",
+            0x7A: "F1", 0x78: "F2", 0x63: "F3", 0x76: "F4",
+            0x62: "F7", 0x64: "F8", 0x65: "F9",
+            0x6D: "F10", 0x67: "F11", 0x6F: "F12",
+        ]
+        for (name, code) in selectableKeys {
+            map[code] = name
+        }
+        return map
+    }()
 
     public static func name(forKeyCode keyCode: UInt16) -> String {
         keyNames[keyCode] ?? "Key \(String(format: "0x%02X", keyCode))"
