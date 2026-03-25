@@ -23,12 +23,31 @@ struct SettingsView: View {
 
 // MARK: - General
 
+private let availableHotkeys: [(name: String, keyCode: UInt16)] = [
+    ("Right Option", 0x3D),
+    ("Left Option", 0x3A),
+    ("Right Command", 0x36),
+    ("Right Shift", 0x3C),
+    ("Right Control", 0x3E),
+    ("F5", 0x60),
+    ("F6", 0x61),
+]
+
 struct GeneralSettingsSection: View {
     @Bindable var settings: SettingsManager
 
     var body: some View {
         Section("Hotkey") {
-            Text("Hotkey-Konfiguration kommt in Issue #4")
+            Picker("Taste", selection: $settings.hotkey.keyCode) {
+                ForEach(availableHotkeys, id: \.keyCode) { hotkey in
+                    Text(hotkey.name).tag(hotkey.keyCode)
+                }
+            }
+
+            Toggle("Halten zum Aufnehmen", isOn: $settings.hotkey.requiresHold)
+
+            Text("Änderung wird nach Neustart der App wirksam.")
+                .font(.caption)
                 .foregroundStyle(.secondary)
         }
 

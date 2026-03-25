@@ -88,6 +88,14 @@ public final class HotkeyManagerImpl: HotkeyMonitoring, HotkeyConfiguring, @unch
 
         let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
 
+        // Capture mode: forward keypress to waiting continuation
+        if captureContinuation != nil {
+            if type == .keyDown || (type == .flagsChanged && Self.isModifierPressed(keyCode: keyCode, flags: event.flags)) {
+                handleCapturedKey(keyCode: keyCode)
+            }
+            return
+        }
+
         switch type {
         case .flagsChanged:
             let flags = event.flags
@@ -117,8 +125,34 @@ public final class HotkeyManagerImpl: HotkeyMonitoring, HotkeyConfiguring, @unch
         }
     }
 
+    private var captureContinuation: CheckedContinuation<HotkeyConfiguration?, Never>?
+
     public func captureNextKeyPress(timeout: Duration) async -> HotkeyConfiguration? {
-        nil
+        dispatcher.suspend()
+        defer {
+            captureContinuation = nil
+            dispatcher.resume()
+        }
+
+        return await withCheckedContinuation { continuation in
+            self.captureContinuation = continuation
+
+            Task {
+                try? await Task.sleep(for: timeout)
+                // If continuation is still waiting, resume with nil (timeout)
+                if let cont = self.captureContinuation {
+                    self.captureContinuation = nil
+                    cont.resume(returning: nil)
+                }
+            }
+        }
+    }
+
+    fileprivate func handleCapturedKey(keyCode: UInt16) {
+        guard let cont = captureContinuation else { return }
+        captureContinuation = nil
+        let config = HotkeyConfiguration(keyCode: keyCode, modifierFlags: 0, requiresHold: true)
+        cont.resume(returning: config)
     }
 }
 

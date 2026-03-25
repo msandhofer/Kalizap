@@ -47,7 +47,12 @@ struct DerFluistererApp: App {
     @MainActor
     private func startPipeline() async {
         let appDetector = NSWorkspaceAppDetector()
-        let hotkey = HotkeyManagerImpl()
+        let hotkeyConfig = HotkeyConfiguration(
+            keyCode: settings.hotkey.keyCode,
+            modifierFlags: settings.hotkey.modifierFlags,
+            requiresHold: settings.hotkey.requiresHold
+        )
+        let hotkey = HotkeyManagerImpl(configuration: hotkeyConfig)
         let recorder = AudioRecorderImpl()
         let backend = WhisperKitBackend(model: settings.audio.whisperModel.rawValue)
         let transcriber = WhisperTranscriptionEngine(backend: backend)
