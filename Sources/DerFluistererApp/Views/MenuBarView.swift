@@ -23,9 +23,8 @@ struct MenuBarView: View {
             }
             .disabled(updater?.canCheckForUpdates != true)
 
-            Button("Einstellungen…") {
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-                NSApp.activate(ignoringOtherApps: true)
+            SettingsLink {
+                Text("Einstellungen…")
             }
             .keyboardShortcut(",")
 
