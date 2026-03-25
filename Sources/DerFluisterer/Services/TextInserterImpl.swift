@@ -12,7 +12,7 @@ public final class TextInserterImpl: TextInserting, @unchecked Sendable {
         keystroke: any KeystrokeSimulating,
         accessibility: any AccessibilityInserting,
         appDetector: any ActiveAppDetecting,
-        restoreDelay: Duration = .milliseconds(80)
+        restoreDelay: Duration = .milliseconds(500)
     ) {
         self.clipboard = clipboard
         self.keystroke = keystroke
@@ -24,7 +24,21 @@ public final class TextInserterImpl: TextInserting, @unchecked Sendable {
     public func insert(_ text: String) async -> InsertionResult {
         let targetApp = appDetector.frontmostApp()
 
-        // Happy path: clipboard-based insertion
+        // Prefer accessibility API when a text field is focused — avoids clipboard issues
+        if accessibility.hasTextFieldFocus() {
+            do {
+                try await accessibility.insertViaAccessibility(text: text)
+                return InsertionResult(
+                    outcome: .inserted(method: .accessibility),
+                    targetApp: targetApp,
+                    clipboardRestored: false
+                )
+            } catch {
+                // Fall through to clipboard method
+            }
+        }
+
+        // Clipboard-based insertion
         do {
             let snapshot = try await clipboard.backup()
             try await clipboard.set(text: text)
@@ -37,20 +51,6 @@ public final class TextInserterImpl: TextInserting, @unchecked Sendable {
                 clipboardRestored: true
             )
         } catch {
-            // Fallback: try accessibility API
-            if accessibility.hasTextFieldFocus() {
-                do {
-                    try await accessibility.insertViaAccessibility(text: text)
-                    return InsertionResult(
-                        outcome: .inserted(method: .accessibility),
-                        targetApp: targetApp,
-                        clipboardRestored: false
-                    )
-                } catch {
-                    // Both methods failed — fall through to pendingInClipboard
-                }
-            }
-
             // Last resort: leave text in clipboard for manual paste
             try? await clipboard.set(text: text)
             return InsertionResult(
