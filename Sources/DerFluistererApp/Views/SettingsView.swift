@@ -8,6 +8,7 @@ struct SettingsView: View {
         ScrollView {
             Form {
                 GeneralSettingsSection(settings: settings)
+                UpdateSettingsSection(settings: settings)
                 AudioSettingsSection(settings: settings)
                 CorrectionSettingsSection(settings: settings)
                 APIKeySettingsSection(settings: settings)
@@ -44,6 +45,38 @@ struct GeneralSettingsSection: View {
             )
 
             Toggle("Debug-Modus", isOn: $settings.system.debugMode)
+        }
+    }
+}
+
+// MARK: - Update
+
+struct UpdateSettingsSection: View {
+    @Bindable var settings: SettingsManager
+
+    var body: some View {
+        Section("Updates") {
+            Toggle("Automatisch nach Updates suchen", isOn: $settings.update.autoCheckEnabled)
+
+            Toggle("Updates automatisch im Hintergrund installieren", isOn: $settings.update.silentAutoUpdate)
+                .disabled(!settings.update.autoCheckEnabled)
+
+            if let warning = settings.feedUnreachableWarning {
+                Label(warning, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .font(.caption)
+            }
+
+            LabeledContent("Update-Feed") {
+                Text(SparkleUpdater.feedURL.absoluteString)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+
+            Button("Release Notes anzeigen") {
+                NSWorkspace.shared.open(SparkleUpdater.releaseNotesURL)
+            }
         }
     }
 }

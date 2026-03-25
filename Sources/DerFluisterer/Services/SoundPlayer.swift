@@ -28,3 +28,13 @@ public final class SoundPlayer: @unchecked Sendable {
         backend.play(.recordingStopped)
     }
 }
+
+extension SoundPlayer: SoundPlaying {
+    public func playStartSound() async {
+        playRecordingStarted()
+    }
+
+    public func playStopSound() async {
+        playRecordingStopped()
+    }
+}

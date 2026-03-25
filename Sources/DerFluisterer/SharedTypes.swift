@@ -20,6 +20,7 @@ public struct CorrectionIntensity: Codable, Equatable, Sendable {
 }
 
 public enum PipelineState: Equatable, Sendable {
+    case loadingModel(progress: Double)
     case idle
     case recording
     case processing(stage: ProcessingStage)

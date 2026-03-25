@@ -9,20 +9,33 @@ struct DerFluistererApp: App {
         apiKeyValidator: AnthropicAPIKeyValidator(),
         launchAtLogin: LaunchAtLoginService()
     )
-    @State private var recordingVM = RecordingViewModel()
     @State private var historyVM: HistoryViewModel
     @State private var statisticsVM: StatisticsViewModel
+    @State private var pipeline: DictationPipeline?
+    @State private var updater: SparkleUpdater?
+
+    private let store: any DictationStoring
 
     init() {
         let container = try! ModelContainer(for: DictationRecord.self)
-        let store = DictationStoreImpl(modelContainer: container)
+        let store: any DictationStoring = DictationStoreImpl(modelContainer: container)
+        self.store = store
         _historyVM = State(initialValue: HistoryViewModel(store: store))
         _statisticsVM = State(initialValue: StatisticsViewModel(store: store))
     }
 
     var body: some Scene {
         MenuBarExtra("DerFlüsterer", systemImage: menuBarIcon) {
-            MenuBarView(settings: settings, recordingVM: recordingVM)
+            MenuBarView(settings: settings, pipeline: pipeline, updater: updater)
+                .task {
+                    if updater == nil {
+                        let u = SparkleUpdater(settings: settings)
+                        updater = u
+                        u.start()
+                    }
+                    guard pipeline == nil else { return }
+                    await startPipeline()
+                }
         }
         .menuBarExtraStyle(.window)
 
@@ -31,9 +44,65 @@ struct DerFluistererApp: App {
         }
     }
 
+    @MainActor
+    private func startPipeline() async {
+        let appDetector = NSWorkspaceAppDetector()
+        let hotkey = HotkeyManagerImpl()
+        let recorder = AudioRecorderImpl()
+        let backend = WhisperKitBackend()
+        let transcriber = WhisperTranscriptionEngine(backend: backend)
+        let apiKeyProvider: @Sendable () throws -> String = { [settings] in
+            try settings.resolveAPIKeySendable()
+        }
+        let transport = ClaudeAPITransport.makeTransport(apiKeyProvider: apiKeyProvider)
+        let corrector = TextCorrectorImpl(
+            config: CorrectionConfig(),
+            transport: transport,
+            apiKeyProvider: apiKeyProvider
+        )
+        let inserter = TextInserterImpl(
+            clipboard: NSPasteboardClipboardManager(),
+            keystroke: CGEventKeystrokeSimulator(),
+            accessibility: AXAccessibilityInserter(),
+            appDetector: appDetector
+        )
+        let sound = SoundPlayer(
+            backend: SystemSoundBackend(),
+            soundsEnabled: settings.audio.soundsEnabled
+        )
+
+        let deps = PipelineDependencies(
+            hotkey: hotkey,
+            recorder: recorder,
+            metering: recorder,
+            transcriber: transcriber,
+            corrector: corrector,
+            inserter: inserter,
+            appDetector: appDetector,
+            store: store,
+            sound: sound,
+            settings: settings
+        )
+
+        let p = DictationPipeline(dependencies: deps)
+        pipeline = p
+        await p.loadModelAndActivate()
+    }
+
     private var menuBarIcon: String {
-        if recordingVM.isRecording {
-            return recordingVM.menuBarIcon
+        if let pipeline {
+            switch pipeline.state {
+            case .loadingModel:
+                return "arrow.down.circle"
+            case .recording:
+                return "waveform"
+            case .processing:
+                return "ellipsis.circle"
+            case .error:
+                return "mic.fill.badge.xmark"
+            case .idle, .pendingInClipboard:
+                break
+            }
         }
         switch settings.apiKeyStatus {
         case .missing, .invalid:

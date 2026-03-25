@@ -7,22 +7,46 @@ extension ContinuousClock.Instant {
     }
 }
 
-protocol SoundPlaying: Sendable {
+public protocol SoundPlaying: Sendable {
     func playStartSound() async
     func playStopSound() async
 }
 
-struct PipelineDependencies {
-    let hotkey: any HotkeyMonitoring
-    let recorder: any AudioCapturing
-    let metering: any AudioLevelMetering
-    let transcriber: any TranscriptionEngine
-    let corrector: any TextCorrecting
-    let inserter: any TextInserting
-    let appDetector: any ActiveAppDetecting
-    let store: any DictationStoring
-    let sound: any SoundPlaying
-    let settings: SettingsManager
+public struct PipelineDependencies {
+    public let hotkey: any HotkeyMonitoring
+    public let recorder: any AudioCapturing
+    public let metering: any AudioLevelMetering
+    public let transcriber: any TranscriptionEngine
+    public let corrector: any TextCorrecting
+    public let inserter: any TextInserting
+    public let appDetector: any ActiveAppDetecting
+    public let store: any DictationStoring
+    public let sound: any SoundPlaying
+    public let settings: SettingsManager
+
+    public init(
+        hotkey: any HotkeyMonitoring,
+        recorder: any AudioCapturing,
+        metering: any AudioLevelMetering,
+        transcriber: any TranscriptionEngine,
+        corrector: any TextCorrecting,
+        inserter: any TextInserting,
+        appDetector: any ActiveAppDetecting,
+        store: any DictationStoring,
+        sound: any SoundPlaying,
+        settings: SettingsManager
+    ) {
+        self.hotkey = hotkey
+        self.recorder = recorder
+        self.metering = metering
+        self.transcriber = transcriber
+        self.corrector = corrector
+        self.inserter = inserter
+        self.appDetector = appDetector
+        self.store = store
+        self.sound = sound
+        self.settings = settings
+    }
 }
 
 private struct DictationJob {
@@ -34,10 +58,10 @@ private struct DictationJob {
 }
 
 @Observable @MainActor
-final class DictationPipeline {
+public final class DictationPipeline {
     private static let maxStateHistory = 50
 
-    private(set) var state: PipelineState = .idle {
+    public private(set) var state: PipelineState = .idle {
         didSet {
             stateHistory.append(state)
             if stateHistory.count > Self.maxStateHistory {
@@ -48,11 +72,11 @@ final class DictationPipeline {
             }
         }
     }
-    private(set) var latencyMs: Int?
-    private(set) var lastError: PipelineError?
-    private(set) var stateHistory: [PipelineState] = []
-    private(set) var streamingText: String = ""
-    private(set) var audioLevel: Float = 0
+    public private(set) var latencyMs: Int?
+    public private(set) var lastError: PipelineError?
+    public private(set) var stateHistory: [PipelineState] = []
+    public private(set) var streamingText: String = ""
+    public private(set) var audioLevel: Float = 0
 
     private let deps: PipelineDependencies
     private var isRecording = false
@@ -62,11 +86,11 @@ final class DictationPipeline {
     private var levelTask: Task<Void, Never>?
     private var collectedChunks: [AudioChunk] = []
 
-    init(dependencies: PipelineDependencies) {
+    public init(dependencies: PipelineDependencies) {
         self.deps = dependencies
     }
 
-    func activate() async {
+    public func activate() async {
         for await event in deps.hotkey.events {
             switch event {
             case .recordingStarted:
@@ -77,19 +101,44 @@ final class DictationPipeline {
         }
     }
 
-    func deactivate() {
+    public func loadModelAndActivate() async {
+        let language = TranscriptionLanguage(rawValue: deps.settings.audio.language.rawValue) ?? .german
+        state = .loadingModel(progress: 0)
+        do {
+            try await deps.transcriber.loadModel(for: language) { [weak self] progress in
+                Task { @MainActor in
+                    self?.state = .loadingModel(progress: progress)
+                }
+            }
+        } catch {
+            state = .error(PipelineError(message: "Modell konnte nicht geladen werden: \(error.localizedDescription)", isRecoverable: true))
+            return
+        }
+
+        do {
+            try await deps.hotkey.start()
+        } catch {
+            state = .error(PipelineError(message: "Accessibility-Berechtigung fehlt. Bitte in Systemeinstellungen aktivieren.", isRecoverable: true))
+            return
+        }
+
+        state = .idle
+        await activate()
+    }
+
+    public func deactivate() {
         cancelDictation()
     }
 
-    func startDictation() async {
+    public func startDictation() async {
         await handleStart()
     }
 
-    func stopDictation() async {
+    public func stopDictation() async {
         await handleStop()
     }
 
-    func cancelDictation() {
+    public func cancelDictation() {
         cancelled = true
         isRecording = false
         stopStreamingAndMetering()
@@ -100,7 +149,7 @@ final class DictationPipeline {
         state = .idle
     }
 
-    func dismissError() {
+    public func dismissError() {
         if case .error = state {
             state = .idle
         }

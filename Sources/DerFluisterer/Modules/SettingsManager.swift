@@ -46,6 +46,17 @@ public struct CorrectionSettings: Codable, Equatable {
     }
 }
 
+public struct UpdateSettings: Codable, Equatable {
+    public var autoCheckEnabled: Bool = true
+    public var silentAutoUpdate: Bool = false
+    public var lastSuccessfulUpdateCheck: Date? = nil
+    public init(autoCheckEnabled: Bool = true, silentAutoUpdate: Bool = false, lastSuccessfulUpdateCheck: Date? = nil) {
+        self.autoCheckEnabled = autoCheckEnabled
+        self.silentAutoUpdate = silentAutoUpdate
+        self.lastSuccessfulUpdateCheck = lastSuccessfulUpdateCheck
+    }
+}
+
 public struct SystemSettings: Codable, Equatable {
     public var autoStart: Bool = false
     public var historyLimit: Int = 100
@@ -88,6 +99,7 @@ public final class SettingsManager {
     public var hotkey: HotkeySettings { didSet { persist(hotkey, forKey: "hotkey") } }
     public var correction: CorrectionSettings { didSet { persist(correction, forKey: "correction") } }
     public var system: SystemSettings { didSet { persist(system, forKey: "system") } }
+    public var update: UpdateSettings { didSet { persist(update, forKey: "update") } }
 
     public private(set) var apiKeyStatus: APIKeyStatus = .missing
 
@@ -105,6 +117,7 @@ public final class SettingsManager {
         self.hotkey = Self.load(from: defaults, forKey: "hotkey") ?? HotkeySettings()
         self.correction = Self.load(from: defaults, forKey: "correction") ?? CorrectionSettings()
         self.system = Self.load(from: defaults, forKey: "system") ?? SystemSettings()
+        self.update = Self.load(from: defaults, forKey: "update") ?? UpdateSettings()
     }
 
     private static let apiKeyAccount = "anthropic-api-key"
@@ -115,6 +128,10 @@ public final class SettingsManager {
 
     public func resolveAPIKey() throws -> String {
         try keychain.retrieve(for: Self.apiKeyAccount)
+    }
+
+    nonisolated public func resolveAPIKeySendable() throws -> String {
+        try keychain.retrieve(for: "anthropic-api-key")
     }
 
     public func deleteAPIKey() throws {
@@ -129,6 +146,13 @@ public final class SettingsManager {
             try launchAtLogin.unregister()
         }
         system.autoStart = enabled
+    }
+
+    public var feedUnreachableWarning: String? {
+        guard let lastCheck = update.lastSuccessfulUpdateCheck else { return nil }
+        let daysSinceLastCheck = Calendar.current.dateComponents([.day], from: lastCheck, to: Date()).day ?? 0
+        guard daysSinceLastCheck >= 30 else { return nil }
+        return "Auto-Update-Server seit \(daysSinceLastCheck) Tagen nicht erreichbar"
     }
 
     public func validateAPIKey() async {

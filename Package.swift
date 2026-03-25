@@ -24,7 +24,8 @@ let package = Package(
         ),
         .executableTarget(
             name: "DerFluistererApp",
-            dependencies: ["DerFluisterer"]
+            dependencies: ["DerFluisterer"],
+            exclude: ["Info.plist"]
         ),
         .executableTarget(
             name: "HotkeyTestCLI",

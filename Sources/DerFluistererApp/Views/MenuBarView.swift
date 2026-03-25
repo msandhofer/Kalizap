@@ -3,7 +3,8 @@ import DerFluisterer
 
 struct MenuBarView: View {
     @Bindable var settings: SettingsManager
-    var recordingVM: RecordingViewModel
+    var pipeline: DictationPipeline?
+    var updater: SparkleUpdater?
 
     var body: some View {
         VStack(spacing: 8) {
@@ -11,18 +12,16 @@ struct MenuBarView: View {
                 .font(.headline)
                 .padding(.top, 8)
 
-            if recordingVM.isRecording {
-                WaveformView(levels: recordingVM.waveformLevels)
-                    .padding(.horizontal, 8)
-
-                Text("Aufnahme läuft…")
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
+            pipelineStatusView
 
             apiKeyStatusView
 
             Divider()
+
+            Button("Nach Updates suchen…") {
+                updater?.checkForUpdates()
+            }
+            .disabled(updater?.canCheckForUpdates != true)
 
             Button("Einstellungen…") {
                 NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
@@ -38,6 +37,60 @@ struct MenuBarView: View {
         .padding(8)
         .task {
             await settings.validateAPIKey()
+        }
+    }
+
+    @ViewBuilder
+    private var pipelineStatusView: some View {
+        if let pipeline {
+            switch pipeline.state {
+            case .loadingModel(let progress):
+                VStack(spacing: 4) {
+                    ProgressView(value: progress)
+                        .padding(.horizontal, 8)
+                    Text("Modell wird geladen… \(Int(progress * 100))%")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+            case .recording:
+                WaveformView(levels: [pipeline.audioLevel])
+                    .padding(.horizontal, 8)
+                Text("Aufnahme läuft…")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+
+            case .processing(let stage):
+                HStack(spacing: 4) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(stage.localizedLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+            case .pendingInClipboard:
+                Label("Text in Zwischenablage", systemImage: "doc.on.clipboard")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+
+            case .error(let error):
+                VStack(spacing: 4) {
+                    Label(error.message, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                        .font(.caption)
+                    if error.isRecoverable {
+                        Button("Erneut versuchen") {
+                            pipeline.dismissError()
+                            Task { await pipeline.loadModelAndActivate() }
+                        }
+                        .font(.caption)
+                    }
+                }
+
+            case .idle:
+                EmptyView()
+            }
         }
     }
 
@@ -59,6 +112,16 @@ struct MenuBarView: View {
             Label("API-Key ungültig: \(message)", systemImage: "xmark.circle.fill")
                 .foregroundStyle(.red)
                 .font(.caption)
+        }
+    }
+}
+
+private extension PipelineState.ProcessingStage {
+    var localizedLabel: String {
+        switch self {
+        case .transcribing: "Transkribiere…"
+        case .correcting: "Korrigiere…"
+        case .inserting: "Füge ein…"
         }
     }
 }
