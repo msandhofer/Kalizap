@@ -73,12 +73,15 @@ public final class DictationPipeline {
     public private(set) var streamingText: String = ""
     public private(set) var audioLevel: Float = 0
 
+    private static let recordingTimeout: Duration = .seconds(120)
+
     private let deps: PipelineDependencies
     private var isRecording = false
     private var cancelled = false
     private var processingChain: Task<Void, Never>?
     private var streamingTask: Task<Void, Never>?
     private var levelTask: Task<Void, Never>?
+    private var recordingWatchdog: Task<Void, Never>?
     private var collectedChunks: [AudioChunk] = []
 
     public init(dependencies: PipelineDependencies) {
@@ -148,6 +151,7 @@ public final class DictationPipeline {
     public func cancelDictation() {
         cancelled = true
         isRecording = false
+        recordingWatchdog?.cancel()
         stopStreamingAndMetering()
         processingChain?.cancel()
         processingChain = nil
@@ -178,6 +182,7 @@ public final class DictationPipeline {
         streamingText = ""
         collectedChunks = []
         state = .recording
+        startRecordingWatchdog()
         await deps.sound.playStartSound()
         do {
             try await deps.recorder.startRecording()
@@ -185,11 +190,22 @@ public final class DictationPipeline {
             startLevelMetering()
         } catch {
             isRecording = false
+            recordingWatchdog?.cancel()
             state = .error(PipelineError(message: error.localizedDescription, isRecoverable: true))
         }
     }
 
+    private func startRecordingWatchdog() {
+        recordingWatchdog?.cancel()
+        recordingWatchdog = Task { [weak self] in
+            try? await Task.sleep(for: Self.recordingTimeout)
+            guard let self, !Task.isCancelled, self.isRecording else { return }
+            await self.handleStop()
+        }
+    }
+
     private func handleStop() async {
+        recordingWatchdog?.cancel()
         let stopTimestamp = ContinuousClock.now
         isRecording = false
 
