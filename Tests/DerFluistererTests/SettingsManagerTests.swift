@@ -57,6 +57,11 @@ final class SettingsManagerDefaultsTests: XCTestCase {
         XCTAssertEqual(sut.audio, AudioSettings())
     }
 
+    func test_audioSettings_whisperModelDefaultIsLargeV3Turbo() {
+        let sut = makeSettingsManager()
+        XCTAssertEqual(sut.audio.whisperModel, .largeV3Turbo)
+    }
+
     func test_newSettingsManager_hasCorrectHotkeyDefaults() {
         let sut = makeSettingsManager()
         XCTAssertEqual(sut.hotkey, HotkeySettings())

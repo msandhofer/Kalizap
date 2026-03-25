@@ -1,13 +1,33 @@
 import Foundation
 
+public enum WhisperModel: String, Codable, CaseIterable, Sendable {
+    case tiny
+    case base
+    case small
+    case largeV3 = "large-v3"
+    case largeV3Turbo = "openai_whisper-large-v3_turbo"
+
+    public var displayName: String {
+        switch self {
+        case .tiny: "Tiny (~75 MB)"
+        case .base: "Base (~140 MB)"
+        case .small: "Small (~460 MB)"
+        case .largeV3: "Large v3 (~1.5 GB)"
+        case .largeV3Turbo: "Large v3 Turbo (~950 MB)"
+        }
+    }
+}
+
 public struct AudioSettings: Codable, Equatable {
     public var microphoneID: String? = nil
     public var language: SupportedLanguage = .de
     public var soundsEnabled: Bool = true
-    public init(microphoneID: String? = nil, language: SupportedLanguage = .de, soundsEnabled: Bool = true) {
+    public var whisperModel: WhisperModel = .largeV3Turbo
+    public init(microphoneID: String? = nil, language: SupportedLanguage = .de, soundsEnabled: Bool = true, whisperModel: WhisperModel = .largeV3Turbo) {
         self.microphoneID = microphoneID
         self.language = language
         self.soundsEnabled = soundsEnabled
+        self.whisperModel = whisperModel
     }
 }
 

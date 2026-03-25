@@ -49,7 +49,7 @@ struct DerFluistererApp: App {
         let appDetector = NSWorkspaceAppDetector()
         let hotkey = HotkeyManagerImpl()
         let recorder = AudioRecorderImpl()
-        let backend = WhisperKitBackend()
+        let backend = WhisperKitBackend(model: settings.audio.whisperModel.rawValue)
         let transcriber = WhisperTranscriptionEngine(backend: backend)
         let apiKeyProvider: @Sendable () throws -> String = { [settings] in
             try settings.resolveAPIKeySendable()

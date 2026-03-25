@@ -92,6 +92,17 @@ struct AudioSettingsSection: View {
                 .foregroundStyle(.secondary)
         }
 
+        Section("Whisper-Modell") {
+            Picker("Modell", selection: $settings.audio.whisperModel) {
+                ForEach(WhisperModel.allCases, id: \.self) { model in
+                    Text(model.displayName).tag(model)
+                }
+            }
+            Text("Änderung wird nach Neustart der App wirksam.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+
         Section("Sprache") {
             Picker("Sprache", selection: $settings.audio.language) {
                 Text("Deutsch").tag(SupportedLanguage.de)
