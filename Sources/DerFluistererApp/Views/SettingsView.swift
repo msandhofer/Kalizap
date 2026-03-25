@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import DerFluisterer
 
@@ -278,8 +279,9 @@ struct DictionarySettingsSection: View {
 
 struct AppMappingSection: View {
     @Bindable var settings: SettingsManager
-    @State private var newBundleID = ""
+    @State private var selectedBundleID = ""
     @State private var newMode: ContextMode = .formal
+    @State private var runningApps: [RunningAppInfo] = []
 
     private var sortedMappings: [(key: String, value: ContextMode)] {
         settings.correction.appMapping.sorted { $0.key < $1.key }
@@ -289,8 +291,8 @@ struct AppMappingSection: View {
         Section("App-Zuordnung (Auto-Modus)") {
             ForEach(sortedMappings, id: \.key) { bundleID, mode in
                 HStack {
-                    Text(bundleID)
-                        .font(.system(.body, design: .monospaced))
+                    appIcon(for: bundleID)
+                    Text(appName(for: bundleID))
                         .lineLimit(1)
                     Spacer()
                     ContextModePicker(label: "", selection: Binding(
@@ -308,22 +310,66 @@ struct AppMappingSection: View {
             }
 
             HStack {
-                TextField("Bundle-ID (z.B. com.apple.Notes)", text: $newBundleID)
-                    .onSubmit { addMapping() }
+                Picker("App", selection: $selectedBundleID) {
+                    Text("App wählen…").tag("")
+                    ForEach(runningApps) { app in
+                        Text(app.name).tag(app.bundleID)
+                    }
+                }
+                .frame(minWidth: 200)
+
                 ContextModePicker(label: "", selection: $newMode)
                     .frame(width: 130)
                 Button("Hinzufügen") { addMapping() }
-                    .disabled(newBundleID.isEmpty)
+                    .disabled(selectedBundleID.isEmpty)
             }
+
+            Text("Es werden nur aktuell geöffnete Apps angezeigt.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
+        .onAppear { refreshApps() }
     }
 
     private func addMapping() {
-        let trimmed = newBundleID.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
-        settings.correction.appMapping[trimmed] = newMode
-        newBundleID = ""
+        guard !selectedBundleID.isEmpty else { return }
+        settings.correction.appMapping[selectedBundleID] = newMode
+        selectedBundleID = ""
     }
+
+    private func refreshApps() {
+        let existing = Set(settings.correction.appMapping.keys)
+        runningApps = NSWorkspace.shared.runningApplications
+            .filter { $0.activationPolicy == .regular }
+            .compactMap { app -> RunningAppInfo? in
+                guard let bundleID = app.bundleIdentifier,
+                      !existing.contains(bundleID) else { return nil }
+                return RunningAppInfo(bundleID: bundleID, name: app.localizedName ?? bundleID)
+            }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private func appName(for bundleID: String) -> String {
+        if let path = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+            return FileManager.default.displayName(atPath: path.path)
+        }
+        return bundleID
+    }
+
+    @ViewBuilder
+    private func appIcon(for bundleID: String) -> some View {
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                .resizable()
+                .frame(width: 20, height: 20)
+        }
+    }
+}
+
+private struct RunningAppInfo: Identifiable {
+    let bundleID: String
+    let name: String
+    var id: String { bundleID }
 }
 
 struct ContextModePicker: View {
