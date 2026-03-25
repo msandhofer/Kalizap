@@ -79,11 +79,18 @@ struct MenuBarView: View {
                         .foregroundStyle(.red)
                         .font(.caption)
                     if error.isRecoverable {
-                        Button("Erneut versuchen") {
-                            pipeline.dismissError()
-                            Task { await pipeline.loadModelAndActivate() }
+                        HStack(spacing: 8) {
+                            Button("Erneut versuchen") {
+                                pipeline.dismissError()
+                                Task { await pipeline.loadModelAndActivate() }
+                            }
+                            .font(.caption)
+
+                            SettingsLink {
+                                Text("Einstellungen")
+                            }
+                            .font(.caption)
                         }
-                        .font(.caption)
                     }
                 }
 
