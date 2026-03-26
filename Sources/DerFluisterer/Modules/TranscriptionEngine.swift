@@ -61,12 +61,22 @@ public enum TranscriptionLanguage: String, Sendable {
     case english = "en"
 }
 
-public enum TranscriptionError: Error, Sendable, Equatable {
+public enum TranscriptionError: Error, Sendable, Equatable, LocalizedError {
     case modelNotLoaded
     case modelLoadFailed(reason: String)
     case streamingFailed(reason: String)
     case batchFailed(reason: String)
     case cancelled
+
+    public var errorDescription: String? {
+        switch self {
+        case .modelNotLoaded: "Whisper-Modell nicht geladen"
+        case .modelLoadFailed(let reason): "Modell-Laden fehlgeschlagen: \(reason)"
+        case .streamingFailed(let reason): "Streaming fehlgeschlagen: \(reason)"
+        case .batchFailed(let reason): "Transkription fehlgeschlagen: \(reason)"
+        case .cancelled: "Abgebrochen"
+        }
+    }
 }
 
 public protocol TranscriptionEngine: Sendable {

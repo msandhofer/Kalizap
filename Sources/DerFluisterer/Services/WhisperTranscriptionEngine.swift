@@ -3,6 +3,8 @@ import Foundation
 public final class WhisperTranscriptionEngine: TranscriptionEngine, @unchecked Sendable {
     private let backend: WhisperBackend
     private var cancelled = false
+    private var transcriptionTask: Task<Void, Never>?
+    private var activeContinuation: AsyncStream<TranscriptionResult>.Continuation?
 
     public init(backend: WhisperBackend) {
         self.backend = backend
@@ -22,34 +24,45 @@ public final class WhisperTranscriptionEngine: TranscriptionEngine, @unchecked S
         cancelled = false
 
         return AsyncStream { continuation in
+            self.activeContinuation = continuation
             let backend = self.backend
 
-            Task { [weak self] in
+            self.transcriptionTask = Task { [weak self] in
                 var allSamples: [Float] = []
+                FileLog.log("TranscriptionEngine — collecting audio chunks")
                 for await chunk in audioChunks {
                     guard self?.cancelled != true else {
+                        FileLog.log("TranscriptionEngine — cancelled during chunk collection")
                         continuation.finish()
+                        self?.activeContinuation = nil
                         return
                     }
                     allSamples.append(contentsOf: chunk.samples)
                 }
 
+                FileLog.log("TranscriptionEngine — collected \(allSamples.count) samples, cancelled=\(self?.cancelled ?? true)")
                 guard self?.cancelled != true, !allSamples.isEmpty else {
+                    FileLog.log("TranscriptionEngine — bailing out (cancelled or empty)")
                     continuation.finish()
+                    self?.activeContinuation = nil
                     return
                 }
 
                 do {
                     let start = ContinuousClock.now
+                    FileLog.log("TranscriptionEngine — calling backend.transcribe (\(allSamples.count) samples)")
                     let result = try await backend.transcribe(
                         samples: allSamples,
                         language: config.language.rawValue,
                         prompt: config.initialPrompt
                     )
                     let elapsed = ContinuousClock.now - start
+                    FileLog.log("TranscriptionEngine — backend returned in \(elapsed), text=\(result.text.prefix(50))")
 
                     guard self?.cancelled != true else {
+                        FileLog.log("TranscriptionEngine — cancelled after transcription")
                         continuation.finish()
+                        self?.activeContinuation = nil
                         return
                     }
 
@@ -60,15 +73,21 @@ public final class WhisperTranscriptionEngine: TranscriptionEngine, @unchecked S
                     )
                     continuation.yield(.final(final_))
                 } catch {
-                    // Stream ends without result on error
+                    FileLog.log("TranscriptionEngine — ERROR: \(error)")
                 }
 
                 continuation.finish()
+                self?.activeContinuation = nil
             }
         }
     }
 
     public func cancel() {
+        FileLog.log("TranscriptionEngine — cancel() called")
         cancelled = true
+        transcriptionTask?.cancel()
+        transcriptionTask = nil
+        activeContinuation?.finish()
+        activeContinuation = nil
     }
 }

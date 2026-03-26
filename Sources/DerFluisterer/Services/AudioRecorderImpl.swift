@@ -128,7 +128,7 @@ final class AudioEngineAdapter: AudioEngineProviding, @unchecked Sendable {
 
         chunkTimestamp = 0
 
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: hwFormat) { [weak self] buffer, _ in
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: nil) { [weak self] buffer, _ in
             self?.processBuffer(buffer, converter: converter, targetFormat: targetFormat)
         }
 

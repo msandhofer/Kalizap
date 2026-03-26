@@ -5,7 +5,7 @@ public enum WhisperModel: String, Codable, CaseIterable, Sendable {
     case base
     case small
     case largeV3 = "large-v3"
-    case largeV3Turbo = "openai_whisper-large-v3_turbo"
+    case largeV3Turbo = "large-v3_turbo"
 
     public var displayName: String {
         switch self {

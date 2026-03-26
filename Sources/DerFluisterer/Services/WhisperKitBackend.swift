@@ -1,5 +1,8 @@
 import Foundation
+import os.log
 import WhisperKit
+
+private let logger = Logger(subsystem: "com.derfluesterer", category: "WhisperKit")
 
 public final class WhisperKitBackend: WhisperBackend, @unchecked Sendable {
     private var whisperKit: WhisperKit?
@@ -13,6 +16,8 @@ public final class WhisperKitBackend: WhisperBackend, @unchecked Sendable {
         for language: TranscriptionLanguage,
         onProgress: @Sendable (Double) -> Void
     ) async throws {
+        FileLog.log("WhisperKitBackend.loadModel START — model=\(modelName)")
+        FileLog.log("  Task.isCancelled=\(Task.isCancelled)")
         do {
             let config = WhisperKitConfig(
                 model: modelName,
@@ -21,12 +26,19 @@ public final class WhisperKitBackend: WhisperBackend, @unchecked Sendable {
                     textDecoderCompute: .cpuAndNeuralEngine
                 ),
                 verbose: true,
-                logLevel: .debug
+                logLevel: .debug,
+                prewarm: true
             )
+            FileLog.log("  WhisperKitConfig created, calling WhisperKit(config)...")
+            FileLog.log("  Task.isCancelled before WhisperKit init=\(Task.isCancelled)")
             whisperKit = try await WhisperKit(config)
+            FileLog.log("  WhisperKit init SUCCESS")
             onProgress(1.0)
         } catch {
-            throw TranscriptionError.modelLoadFailed(reason: error.localizedDescription)
+            let reason = String(describing: error)
+            FileLog.log("  WhisperKit init FAILED: \(reason)")
+            FileLog.log("  Task.isCancelled after error=\(Task.isCancelled)")
+            throw TranscriptionError.modelLoadFailed(reason: reason)
         }
     }
 

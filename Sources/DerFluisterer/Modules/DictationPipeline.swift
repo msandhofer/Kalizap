@@ -1,4 +1,32 @@
 import Foundation
+import os.log
+
+private let logger = Logger(subsystem: "com.derfluesterer", category: "Pipeline")
+
+/// File logger controlled by --verbose-log launch argument.
+public enum FileLog {
+    private static let url = FileManager.default.temporaryDirectory.appending(path: "derfluesterer-debug.log")
+    public static let enabled = CommandLine.arguments.contains("--verbose-log")
+
+    public static func log(_ message: String) {
+        guard enabled else { return }
+        let ts = ISO8601DateFormatter().string(from: Date())
+        let line = "[\(ts)] \(message)\n"
+        if let data = line.data(using: .utf8) {
+            if FileManager.default.fileExists(atPath: url.path) {
+                if let handle = try? FileHandle(forWritingTo: url) {
+                    handle.seekToEndOfFile()
+                    handle.write(data)
+                    handle.closeFile()
+                }
+            } else {
+                try? data.write(to: url)
+            }
+        }
+    }
+
+    public static var path: String { url.path }
+}
 
 extension ContinuousClock.Instant {
     func millisecondsSinceNow() -> Int {
@@ -89,7 +117,9 @@ public final class DictationPipeline {
     }
 
     public func activate() async {
+        FileLog.log("Pipeline.activate — listening for hotkey events")
         for await event in deps.hotkey.events {
+            FileLog.log("Pipeline.activate — event: \(event)")
             switch event {
             case .recordingStarted:
                 await handleStart()
@@ -100,27 +130,36 @@ public final class DictationPipeline {
     }
 
     public func loadModelAndActivate() async {
+        let modelName = deps.settings.audio.whisperModel.rawValue
         let language = TranscriptionLanguage(rawValue: deps.settings.audio.language.rawValue) ?? .german
+        FileLog.log("loadModelAndActivate START — model=\(modelName) language=\(language)")
+        FileLog.log("Task.isCancelled=\(Task.isCancelled)")
         state = .loadingModel(progress: 0)
 
         let estimatedDuration = Duration.seconds(deps.settings.audio.whisperModel.estimatedLoadTimeSeconds)
         let simulated = SimulatedProgress(estimatedDuration: estimatedDuration)
 
-        let progressTask = Task { [weak self] in
+        let progressTask = Task.detached { @Sendable in
             for await progress in simulated.values {
-                await MainActor.run { self?.state = .loadingModel(progress: progress) }
+                await MainActor.run { [weak self] in
+                    self?.state = .loadingModel(progress: progress)
+                }
             }
         }
 
+        FileLog.log("Calling transcriber.loadModel...")
         do {
             try await deps.transcriber.loadModel(for: language) { _ in
                 // Real progress ignored — using simulated progress instead
             }
             simulated.complete()
             await progressTask.value
+            FileLog.log("loadModel SUCCESS")
         } catch {
             simulated.complete()
             progressTask.cancel()
+            FileLog.log("loadModel FAILED: \(error)")
+            FileLog.log("Task.isCancelled after error=\(Task.isCancelled)")
             state = .error(PipelineError(message: "Modell konnte nicht geladen werden: \(error.localizedDescription)", isRecoverable: true))
             return
         }
@@ -138,6 +177,8 @@ public final class DictationPipeline {
 
     public func deactivate() {
         cancelDictation()
+        deps.hotkey.stop()
+        Task { await deps.recorder.stopRecording() }
     }
 
     public func startDictation() async {
@@ -177,6 +218,7 @@ public final class DictationPipeline {
     }
 
     private func handleStart() async {
+        FileLog.log("handleStart — begin")
         cancelled = false
         isRecording = true
         streamingText = ""
@@ -185,10 +227,14 @@ public final class DictationPipeline {
         startRecordingWatchdog()
         await deps.sound.playStartSound()
         do {
+            FileLog.log("handleStart — calling recorder.startRecording")
             try await deps.recorder.startRecording()
+            FileLog.log("handleStart — recorder started, starting audio processing + metering")
             startAudioProcessing()
             startLevelMetering()
+            FileLog.log("handleStart — done")
         } catch {
+            FileLog.log("handleStart — ERROR: \(error)")
             isRecording = false
             recordingWatchdog?.cancel()
             state = .error(PipelineError(message: error.localizedDescription, isRecoverable: true))
@@ -205,17 +251,22 @@ public final class DictationPipeline {
     }
 
     private func handleStop() async {
+        FileLog.log("handleStop — begin, isRecording=\(isRecording)")
         recordingWatchdog?.cancel()
         let stopTimestamp = ContinuousClock.now
         isRecording = false
 
         stopStreamingAndMetering()
+        deps.transcriber.cancel()  // Stop orphaned streaming transcription before it calls backend
 
         await deps.sound.playStopSound()
         await deps.recorder.stopRecording()
+        FileLog.log("handleStop — recorder stopped")
 
         let buffer = collectBuffer()
+        FileLog.log("handleStop — buffer: \(buffer.samples.count) samples, \(String(format: "%.1f", buffer.totalDuration))s, streamingText=\(streamingText.prefix(50))...")
         guard !buffer.samples.isEmpty else {
+            FileLog.log("handleStop — empty buffer, going idle")
             state = .idle
             return
         }
@@ -227,6 +278,7 @@ public final class DictationPipeline {
             language: deps.settings.audio.language,
             streamingResult: streamingText
         )
+        FileLog.log("handleStop — job created, queueing process")
 
         // Chain processing: wait for previous dictation to finish, then process this one
         let previousChain = processingChain
@@ -301,15 +353,21 @@ public final class DictationPipeline {
     }
 
     private func process(_ job: DictationJob) async {
-        guard !cancelled else { return }
+        FileLog.log("process — begin, cancelled=\(cancelled)")
+        guard !cancelled else {
+            FileLog.log("process — cancelled, aborting")
+            return
+        }
 
         deps.corrector.updateConfig(job.correctionConfig)
 
         // Transcribe: use streaming result if available, otherwise batch
+        let useStreaming = !job.streamingResult.isEmpty
+        FileLog.log("process — transcribing (useStreaming=\(useStreaming))")
         updateStateIfNotRecording(.processing(stage: .transcribing))
         let transcription: TranscriptionResult?
 
-        if !job.streamingResult.isEmpty {
+        if useStreaming {
             transcription = .final(FinalTranscription(
                 text: job.streamingResult,
                 segments: [],
@@ -320,13 +378,16 @@ public final class DictationPipeline {
         }
 
         guard !cancelled, let transcription else {
+            FileLog.log("process — transcription failed or cancelled")
             if !cancelled {
                 state = .error(PipelineError(message: "Transcription failed", isRecoverable: true))
             }
             return
         }
+        FileLog.log("process — transcribed: \(transcription.text.prefix(50))...")
 
         // Correct
+        FileLog.log("process — correcting")
         updateStateIfNotRecording(.processing(stage: .correcting))
         let correctionOutcome = await deps.corrector.correct(transcription)
 
@@ -334,10 +395,13 @@ public final class DictationPipeline {
 
         let rawText = transcription.text
         let correctedText = correctionOutcome.text
+        FileLog.log("process — corrected: \(correctedText.prefix(50))...")
 
         // Insert
+        FileLog.log("process — inserting")
         updateStateIfNotRecording(.processing(stage: .inserting))
         let insertionResult = await deps.inserter.insert(correctedText)
+        FileLog.log("process — inserted: \(insertionResult.outcome)")
 
         guard !cancelled else { return }
 
@@ -384,6 +448,7 @@ public final class DictationPipeline {
     }
 
     private func transcribeBatch(buffer: CollectedAudioBuffer, language: SupportedLanguage) async -> TranscriptionResult? {
+        FileLog.log("transcribeBatch — \(buffer.samples.count) samples, \(String(format: "%.1f", buffer.totalDuration))s")
         let chunk = AudioChunk(
             samples: buffer.samples,
             sampleRate: buffer.sampleRate,
@@ -400,9 +465,14 @@ public final class DictationPipeline {
 
         var lastResult: TranscriptionResult?
         for await result in results {
-            if cancelled { return nil }
+            if cancelled {
+                FileLog.log("transcribeBatch — cancelled during iteration")
+                return nil
+            }
+            FileLog.log("transcribeBatch — got result: \(result.text.prefix(50))")
             lastResult = result
         }
+        FileLog.log("transcribeBatch — finished, hasResult=\(lastResult != nil)")
         return lastResult
     }
 }

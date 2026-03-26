@@ -38,7 +38,6 @@ struct MenuBarView: View {
         }
         .padding(8)
         .task {
-            await settings.validateAPIKey()
             await historyVM.startObserving()
         }
     }
@@ -70,6 +69,14 @@ struct MenuBarView: View {
                     Text(stage.localizedLabel)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    if stage == .transcribing {
+                        Button { pipeline.cancelDictation() } label: {
+                            Image(systemName: "xmark")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                    }
                 }
 
             case .pendingInClipboard:
@@ -82,6 +89,8 @@ struct MenuBarView: View {
                     Label(error.message, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.red)
                         .font(.caption)
+                        .help(error.message)
+                        .textSelection(.enabled)
                     if error.isRecoverable {
                         HStack(spacing: 8) {
                             Button("Erneut versuchen") {

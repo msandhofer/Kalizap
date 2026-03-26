@@ -27,7 +27,9 @@ public final class AXAccessibilityInserter: AccessibilityInserting, @unchecked S
         }
 
         let axElement = element as! AXUIElement
-        let setResult = AXUIElementSetAttributeValue(axElement, kAXValueAttribute as CFString, text as CFTypeRef)
+        // Use kAXSelectedTextAttribute to insert at cursor position
+        // (replaces current selection, or inserts if no selection — never overwrites entire field)
+        let setResult = AXUIElementSetAttributeValue(axElement, kAXSelectedTextAttribute as CFString, text as CFTypeRef)
         guard setResult == .success else {
             throw AccessibilityInsertionError.setValueFailed(setResult)
         }

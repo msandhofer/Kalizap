@@ -13,6 +13,7 @@ struct DerFluistererApp: App {
     @State private var statisticsVM: StatisticsViewModel
     @State private var pipeline: DictationPipeline?
     @State private var updater: SparkleUpdater?
+    @State private var apiKeyValidated = false
 
     private let store: any DictationStoring
 
@@ -22,21 +23,32 @@ struct DerFluistererApp: App {
         self.store = store
         _historyVM = State(initialValue: HistoryViewModel(store: store))
         _statisticsVM = State(initialValue: StatisticsViewModel(store: store))
+        FileLog.log("App.init completed — model setting=\(settings.audio.whisperModel.rawValue)")
     }
 
     var body: some Scene {
         MenuBarExtra("DerFlüsterer", systemImage: menuBarIcon) {
             MenuBarView(settings: settings, pipeline: pipeline, updater: updater, historyVM: historyVM)
                 .task {
+                    FileLog.log(".task fired — pipeline=\(pipeline == nil ? "nil" : "exists")")
                     if updater == nil {
                         let u = SparkleUpdater(settings: settings)
                         updater = u
                         u.start()
                     }
                     guard pipeline == nil else { return }
-                    await startPipeline()
+                    // Unstructured Task: survives SwiftUI view recreation
+                    // (menuBarIcon changes cause .task cancellation)
+                    Task {
+                        if !apiKeyValidated {
+                            apiKeyValidated = true
+                            await settings.validateAPIKey()
+                        }
+                        await startPipeline()
+                    }
                 }
                 .onChange(of: settings.audio.whisperModel) {
+                    FileLog.log(".onChange(whisperModel) fired — new value=\(settings.audio.whisperModel.rawValue)")
                     Task { await restartPipeline() }
                 }
         }
@@ -49,17 +61,21 @@ struct DerFluistererApp: App {
 
     @MainActor
     private func restartPipeline() async {
+        FileLog.log("restartPipeline — deactivating old pipeline")
         pipeline?.deactivate()
         pipeline = nil
+        FileLog.log("restartPipeline — starting new pipeline")
         await startPipeline()
     }
 
     @MainActor
     private func startPipeline() async {
+        let modelRawValue = settings.audio.whisperModel.rawValue
+        FileLog.log("startPipeline — model=\(modelRawValue) whisperModel=\(settings.audio.whisperModel)")
         let appDetector = NSWorkspaceAppDetector()
         let hotkey = HotkeyManagerImpl(configuration: settings.hotkey.configuration)
         let recorder = AudioRecorderImpl()
-        let backend = WhisperKitBackend(model: settings.audio.whisperModel.rawValue)
+        let backend = WhisperKitBackend(model: modelRawValue)
         let transcriber = WhisperTranscriptionEngine(backend: backend)
         let apiKeyProvider: @Sendable () throws -> String = { [settings] in
             try settings.resolveAPIKeySendable()

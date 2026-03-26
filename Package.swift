@@ -52,6 +52,11 @@ let package = Package(
             dependencies: ["DerFluisterer"],
             path: "Tools/CorrectorTestCLI"
         ),
+        .executableTarget(
+            name: "WhisperModelTestCLI",
+            dependencies: ["DerFluisterer", "WhisperKit"],
+            path: "Tools/WhisperModelTestCLI"
+        ),
         .testTarget(
             name: "DerFluistererTests",
             dependencies: ["DerFluisterer"]

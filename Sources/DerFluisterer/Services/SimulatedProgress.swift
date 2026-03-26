@@ -42,7 +42,7 @@ public final class SimulatedProgress: Sendable {
         let completed = self._completed
 
         return AsyncStream { continuation in
-            let task = Task {
+            let task = Task.detached {
                 let start = ContinuousClock.now
                 while !Task.isCancelled {
                     if completed.load() {
