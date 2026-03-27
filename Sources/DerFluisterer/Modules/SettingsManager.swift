@@ -34,11 +34,13 @@ public struct AudioSettings: Codable, Equatable {
     public var language: SupportedLanguage = .de
     public var soundsEnabled: Bool = true
     public var whisperModel: WhisperModel = .largeV3Turbo
-    public init(microphoneID: String? = nil, language: SupportedLanguage = .de, soundsEnabled: Bool = true, whisperModel: WhisperModel = .largeV3Turbo) {
+    public var noiseSuppressionEnabled: Bool = true
+    public init(microphoneID: String? = nil, language: SupportedLanguage = .de, soundsEnabled: Bool = true, whisperModel: WhisperModel = .largeV3Turbo, noiseSuppressionEnabled: Bool = true) {
         self.microphoneID = microphoneID
         self.language = language
         self.soundsEnabled = soundsEnabled
         self.whisperModel = whisperModel
+        self.noiseSuppressionEnabled = noiseSuppressionEnabled
     }
 }
 

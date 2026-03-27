@@ -1,8 +1,8 @@
 import Foundation
 @preconcurrency import AVFoundation
+import AudioToolbox
 
 public final class AudioRecorderImpl: AudioRecording, @unchecked Sendable {
-    private let engine = AVAudioEngine()
     private let coordinator: AudioSessionCoordinator
     private let deviceManager: AudioDeviceManager
     private var levelContinuation: AsyncStream<AudioLevel>.Continuation?
@@ -30,7 +30,7 @@ public final class AudioRecorderImpl: AudioRecording, @unchecked Sendable {
         deviceManager.selectedDevice
     }
 
-    public init(deviceProvider: AudioDeviceProviding = CoreAudioDeviceProvider()) {
+    public init(deviceProvider: AudioDeviceProviding = CoreAudioDeviceProvider(), noiseSuppressor: DeepFilterProcessor? = nil) {
         self.deviceManager = AudioDeviceManager(provider: deviceProvider)
 
         var levelCont: AsyncStream<AudioLevel>.Continuation?
@@ -41,11 +41,10 @@ public final class AudioRecorderImpl: AudioRecording, @unchecked Sendable {
         self.availableDevices = AsyncStream { devicesCont = $0 }
         self.devicesContinuation = devicesCont
 
-        // Capture levelCont directly to avoid referencing self before all properties are initialized
-        let avEngine = AudioEngineAdapter(engine: engine, sampleRate: sampleRate) { level in
+        let adapter = AudioQueueAdapter(sampleRate: 16_000, noiseSuppressor: noiseSuppressor) { level in
             levelCont?.yield(level)
         }
-        self.coordinator = AudioSessionCoordinator(engine: avEngine)
+        self.coordinator = AudioSessionCoordinator(engine: adapter)
     }
 
     public func startRecording() async throws {
@@ -82,18 +81,21 @@ public final class AudioRecorderImpl: AudioRecording, @unchecked Sendable {
     }
 }
 
-// MARK: - AVAudioEngine Adapter
+// MARK: - AudioQueue Adapter (input-only, no output to speakers)
 
-final class AudioEngineAdapter: AudioEngineProviding, @unchecked Sendable {
-    private let engine: AVAudioEngine
-    private let sampleRate: Int
+final class AudioQueueAdapter: AudioEngineProviding, @unchecked Sendable {
+    private let outputSampleRate: Int
+    private let noiseSuppressor: DeepFilterProcessor?
     private let onLevel: (AudioLevel) -> Void
     private var continuation: AsyncThrowingStream<AudioChunk, Error>.Continuation?
     private var chunkTimestamp: TimeInterval = 0
+    private var audioQueue: AudioQueueRef?
+    private let numBuffers = 3
+    private let bufferByteSize: UInt32 = 16384
 
-    init(engine: AVAudioEngine, sampleRate: Int, onLevel: @escaping (AudioLevel) -> Void) {
-        self.engine = engine
-        self.sampleRate = sampleRate
+    init(sampleRate: Int, noiseSuppressor: DeepFilterProcessor? = nil, onLevel: @escaping (AudioLevel) -> Void) {
+        self.outputSampleRate = sampleRate
+        self.noiseSuppressor = noiseSuppressor
         self.onLevel = onLevel
     }
 
@@ -104,76 +106,94 @@ final class AudioEngineAdapter: AudioEngineProviding, @unchecked Sendable {
     }
 
     func startCapture() throws {
-        let inputNode = engine.inputNode
-        let hwFormat = inputNode.outputFormat(forBus: 0)
+        // Capture at 48kHz when noise suppression is active (DeepFilterNet3 requires it),
+        // otherwise capture directly at the output sample rate (16kHz).
+        let captureSampleRate = noiseSuppressor != nil ? noiseSuppressor!.inputSampleRate : outputSampleRate
 
-        guard let targetFormat = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: Double(sampleRate),
-            channels: 1,
-            interleaved: false
-        ) else {
-            throw AudioRecorderError.engineSetupFailed(
-                underlying: NSError(domain: "AudioRecorderImpl", code: 1,
-                                    userInfo: [NSLocalizedDescriptionKey: "Cannot create target format"])
-            )
-        }
-
-        guard let converter = AVAudioConverter(from: hwFormat, to: targetFormat) else {
-            throw AudioRecorderError.engineSetupFailed(
-                underlying: NSError(domain: "AudioRecorderImpl", code: 2,
-                                    userInfo: [NSLocalizedDescriptionKey: "Cannot create audio converter"])
-            )
-        }
+        var format = AudioStreamBasicDescription(
+            mSampleRate: Float64(captureSampleRate),
+            mFormatID: kAudioFormatLinearPCM,
+            mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked,
+            mBytesPerPacket: 4,
+            mFramesPerPacket: 1,
+            mBytesPerFrame: 4,
+            mChannelsPerFrame: 1,
+            mBitsPerChannel: 32,
+            mReserved: 0
+        )
 
         chunkTimestamp = 0
+        noiseSuppressor?.resetBuffer()
 
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: nil) { [weak self] buffer, _ in
-            self?.processBuffer(buffer, converter: converter, targetFormat: targetFormat)
+        let selfPtr = Unmanaged.passUnretained(self).toOpaque()
+
+        let status = AudioQueueNewInput(
+            &format,
+            audioQueueCallback,
+            selfPtr,
+            nil,
+            nil,
+            0,
+            &audioQueue
+        )
+        guard status == noErr, let queue = audioQueue else {
+            throw AudioRecorderError.engineSetupFailed(
+                underlying: NSError(domain: "AudioQueueAdapter", code: Int(status),
+                                    userInfo: [NSLocalizedDescriptionKey: "AudioQueueNewInput failed (\(status))"])
+            )
         }
 
-        engine.prepare()
-        try engine.start()
+        for _ in 0..<numBuffers {
+            var buffer: AudioQueueBufferRef?
+            let allocStatus = AudioQueueAllocateBuffer(queue, bufferByteSize, &buffer)
+            guard allocStatus == noErr, let buf = buffer else {
+                throw AudioRecorderError.engineSetupFailed(
+                    underlying: NSError(domain: "AudioQueueAdapter", code: Int(allocStatus),
+                                        userInfo: [NSLocalizedDescriptionKey: "Buffer allocation failed"])
+                )
+            }
+            AudioQueueEnqueueBuffer(queue, buf, 0, nil)
+        }
+
+        let startStatus = AudioQueueStart(queue, nil)
+        guard startStatus == noErr else {
+            throw AudioRecorderError.engineSetupFailed(
+                underlying: NSError(domain: "AudioQueueAdapter", code: Int(startStatus),
+                                    userInfo: [NSLocalizedDescriptionKey: "AudioQueueStart failed (\(startStatus))"])
+            )
+        }
     }
 
     func stopCapture() {
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
+        if let queue = audioQueue {
+            AudioQueueStop(queue, true)
+            AudioQueueDispose(queue, true)
+            audioQueue = nil
+        }
         continuation?.finish()
     }
 
-    private func processBuffer(
-        _ buffer: AVAudioPCMBuffer,
-        converter: AVAudioConverter,
-        targetFormat: AVAudioFormat
-    ) {
-        guard let convertedBuffer = AVAudioPCMBuffer(
-            pcmFormat: targetFormat,
-            frameCapacity: AVAudioFrameCount(Double(buffer.frameLength) * Double(sampleRate) / buffer.format.sampleRate)
-        ) else { return }
+    fileprivate func handleBuffer(_ buffer: AudioQueueBufferRef) {
+        let count = Int(buffer.pointee.mAudioDataByteSize) / MemoryLayout<Float>.size
+        guard count > 0 else { return }
 
-        var error: NSError?
-        nonisolated(unsafe) var allConsumed = false
-        converter.convert(to: convertedBuffer, error: &error) { _, outStatus in
-            if allConsumed {
-                outStatus.pointee = .noDataNow
-                return nil
-            }
-            allConsumed = true
-            outStatus.pointee = .haveData
-            return buffer
+        let ptr = buffer.pointee.mAudioData.assumingMemoryBound(to: Float.self)
+        var samples = Array(UnsafeBufferPointer(start: ptr, count: count))
+
+        // Noise suppression: process at 48kHz, then downsample to 16kHz
+        if let ns = noiseSuppressor {
+            let processed = ns.processChunk(samples)
+            samples = DeepFilterProcessor.downsample48to16(processed)
         }
 
-        guard error == nil, let channelData = convertedBuffer.floatChannelData else { return }
+        guard !samples.isEmpty else { return }
 
-        let frameCount = Int(convertedBuffer.frameLength)
-        let samples = Array(UnsafeBufferPointer(start: channelData[0], count: frameCount))
-        let duration = Double(frameCount) / Double(sampleRate)
+        let duration = Double(samples.count) / Double(outputSampleRate)
         let level = AudioLevelCalculator.calculate(from: samples, timestamp: chunkTimestamp)
 
         let chunk = AudioChunk(
             samples: samples,
-            sampleRate: sampleRate,
+            sampleRate: outputSampleRate,
             timestamp: chunkTimestamp,
             duration: duration,
             level: level
@@ -182,7 +202,26 @@ final class AudioEngineAdapter: AudioEngineProviding, @unchecked Sendable {
         chunkTimestamp += duration
         onLevel(level)
         continuation?.yield(chunk)
+
+        // Re-enqueue buffer for continued capture
+        if let queue = audioQueue {
+            AudioQueueEnqueueBuffer(queue, buffer, 0, nil)
+        }
     }
+}
+
+/// C callback for AudioQueue — bridges to the Swift adapter.
+private func audioQueueCallback(
+    _ inUserData: UnsafeMutableRawPointer?,
+    _ inAQ: AudioQueueRef,
+    _ inBuffer: AudioQueueBufferRef,
+    _ inStartTime: UnsafePointer<AudioTimeStamp>,
+    _ inNumPackets: UInt32,
+    _ inPacketDesc: UnsafePointer<AudioStreamPacketDescription>?
+) {
+    guard let userData = inUserData else { return }
+    let adapter = Unmanaged<AudioQueueAdapter>.fromOpaque(userData).takeUnretainedValue()
+    adapter.handleBuffer(inBuffer)
 }
 
 // MARK: - CoreAudio Device Provider

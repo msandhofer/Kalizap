@@ -30,6 +30,7 @@ let package = Package(
         .target(
             name: "DerFluisterer",
             dependencies: [
+                "CDeepFilter",
                 "WhisperKit",
                 .product(name: "Sparkle", package: "Sparkle"),
             ]
@@ -37,7 +38,10 @@ let package = Package(
         .executableTarget(
             name: "DerFluistererApp",
             dependencies: ["DerFluisterer"],
-            exclude: ["Info.plist"]
+            exclude: ["Info.plist"],
+            resources: [
+                .copy("Resources/DeepFilterNet3_onnx.tar.gz"),
+            ]
         ),
         .executableTarget(
             name: "HotkeyTestCLI",

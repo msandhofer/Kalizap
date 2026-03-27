@@ -1,4 +1,5 @@
 import Foundation
+import Accelerate
 
 public final class WhisperTranscriptionEngine: TranscriptionEngine, @unchecked Sendable {
     private let backend: WhisperBackend
@@ -47,6 +48,9 @@ public final class WhisperTranscriptionEngine: TranscriptionEngine, @unchecked S
                     self?.activeContinuation = nil
                     return
                 }
+
+                // Peak-normalize to improve transcription quality
+                DeepFilterProcessor.peakNormalize(&allSamples)
 
                 do {
                     let start = ContinuousClock.now

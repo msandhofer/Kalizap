@@ -51,6 +51,10 @@ struct DerFluistererApp: App {
                     FileLog.log(".onChange(whisperModel) fired — new value=\(settings.audio.whisperModel.rawValue)")
                     Task { await restartPipeline() }
                 }
+                .onChange(of: settings.audio.noiseSuppressionEnabled) {
+                    FileLog.log(".onChange(noiseSuppression) fired — enabled=\(settings.audio.noiseSuppressionEnabled)")
+                    Task { await restartPipeline() }
+                }
         }
         .menuBarExtraStyle(.window)
 
@@ -74,7 +78,27 @@ struct DerFluistererApp: App {
         FileLog.log("startPipeline — model=\(modelRawValue) whisperModel=\(settings.audio.whisperModel)")
         let appDetector = NSWorkspaceAppDetector()
         let hotkey = HotkeyManagerImpl(configuration: settings.hotkey.configuration)
-        let recorder = AudioRecorderImpl()
+
+        var noiseSuppressor: DeepFilterProcessor? = nil
+        if settings.audio.noiseSuppressionEnabled {
+            if let modelURL = Bundle.module.url(forResource: "DeepFilterNet3_onnx", withExtension: "tar.gz") {
+                // Load on background thread — df_create is CPU-intensive (~30s)
+                noiseSuppressor = await Task.detached(priority: .userInitiated) {
+                    do {
+                        let processor = try DeepFilterProcessor(modelPath: modelURL.path)
+                        FileLog.log("startPipeline — DeepFilterNet3 loaded")
+                        return processor
+                    } catch {
+                        FileLog.log("startPipeline — DeepFilterNet3 load failed: \(error)")
+                        return nil
+                    }
+                }.value
+            } else {
+                FileLog.log("startPipeline — DeepFilterNet3 model not found in bundle")
+            }
+        }
+
+        let recorder = AudioRecorderImpl(noiseSuppressor: noiseSuppressor)
         let backend = WhisperKitBackend(model: modelRawValue)
         let transcriber = WhisperTranscriptionEngine(backend: backend)
         let apiKeyProvider: @Sendable () throws -> String = { [settings] in

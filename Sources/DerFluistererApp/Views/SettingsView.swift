@@ -132,6 +132,13 @@ struct AudioSettingsSection: View {
             .pickerStyle(.segmented)
         }
 
+        Section("Rauschunterdrückung") {
+            Toggle("DeepFilterNet3", isOn: $settings.audio.noiseSuppressionEnabled)
+            Text("Entfernt Hintergrundgeräusche in Echtzeit. Erfordert Neustart der Pipeline.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+
         Section("Feedback") {
             Toggle("Sounds aktiviert", isOn: $settings.audio.soundsEnabled)
         }
