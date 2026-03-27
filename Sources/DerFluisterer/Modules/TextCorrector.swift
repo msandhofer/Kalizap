@@ -83,3 +83,23 @@ public protocol TextCorrecting: Sendable {
     func updateConfig(_ config: CorrectionConfig)
     var lastDebugSnapshot: DebugSnapshot? { get }
 }
+
+// MARK: - CorrectionConfig from Settings
+
+extension CorrectionSettings {
+    public func resolveContextMode(frontmostApp: ActiveApp?) -> ContextMode {
+        guard contextMode == .auto else { return contextMode }
+        if let app = frontmostApp,
+           let appMode = appMapping[app.bundleIdentifier] {
+            return appMode
+        }
+        return .neutral
+    }
+
+    public func buildCorrectionConfig(frontmostApp: ActiveApp?) -> CorrectionConfig {
+        CorrectionConfig(
+            from: self,
+            resolvedContextMode: resolveContextMode(frontmostApp: frontmostApp)
+        )
+    }
+}

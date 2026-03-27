@@ -8,7 +8,7 @@ public final class AudioRecorderImpl: AudioRecording, @unchecked Sendable {
     private var levelContinuation: AsyncStream<AudioLevel>.Continuation?
     private var audioContinuation: AsyncThrowingStream<AudioChunk, Error>.Continuation?
     private var devicesContinuation: AsyncStream<[AudioDevice]>.Continuation?
-    private let sampleRate: Int = 16_000
+    private let sampleRate: Int = AudioProcessingUtils.whisperSampleRate
 
     // MARK: - AudioCapturing
 
@@ -41,7 +41,7 @@ public final class AudioRecorderImpl: AudioRecording, @unchecked Sendable {
         self.availableDevices = AsyncStream { devicesCont = $0 }
         self.devicesContinuation = devicesCont
 
-        let adapter = AudioQueueAdapter(sampleRate: 16_000, noiseSuppressor: noiseSuppressor) { level in
+        let adapter = AudioQueueAdapter(sampleRate: AudioProcessingUtils.whisperSampleRate, noiseSuppressor: noiseSuppressor) { level in
             levelCont?.yield(level)
         }
         self.coordinator = AudioSessionCoordinator(engine: adapter)
@@ -178,19 +178,29 @@ final class AudioQueueAdapter: AudioEngineProviding, @unchecked Sendable {
         guard count > 0 else { return }
 
         let ptr = buffer.pointee.mAudioData.assumingMemoryBound(to: Float.self)
-        var samples = Array(UnsafeBufferPointer(start: ptr, count: count))
+        let rawSamples = Array(UnsafeBufferPointer(start: ptr, count: count))
 
-        // Noise suppression: process at 48kHz, then downsample to 16kHz
-        if let ns = noiseSuppressor {
-            let processed = ns.processChunk(samples)
-            samples = DeepFilterProcessor.downsample48to16(processed)
-        }
-
+        let samples = applyNoiseSuppression(rawSamples)
         guard !samples.isEmpty else { return }
 
+        let chunk = makeChunk(from: samples)
+        onLevel(chunk.level)
+        continuation?.yield(chunk)
+
+        if let queue = audioQueue {
+            AudioQueueEnqueueBuffer(queue, buffer, 0, nil)
+        }
+    }
+
+    private func applyNoiseSuppression(_ samples: [Float]) -> [Float] {
+        guard let ns = noiseSuppressor else { return samples }
+        let processed = ns.processChunk(samples)
+        return AudioProcessingUtils.downsample48to16(processed)
+    }
+
+    private func makeChunk(from samples: [Float]) -> AudioChunk {
         let duration = Double(samples.count) / Double(outputSampleRate)
         let level = AudioLevelCalculator.calculate(from: samples, timestamp: chunkTimestamp)
-
         let chunk = AudioChunk(
             samples: samples,
             sampleRate: outputSampleRate,
@@ -198,15 +208,8 @@ final class AudioQueueAdapter: AudioEngineProviding, @unchecked Sendable {
             duration: duration,
             level: level
         )
-
         chunkTimestamp += duration
-        onLevel(level)
-        continuation?.yield(chunk)
-
-        // Re-enqueue buffer for continued capture
-        if let queue = audioQueue {
-            AudioQueueEnqueueBuffer(queue, buffer, 0, nil)
-        }
+        return chunk
     }
 }
 

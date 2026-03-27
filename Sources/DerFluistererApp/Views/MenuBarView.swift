@@ -48,37 +48,13 @@ struct MenuBarView: View {
         if let pipeline {
             switch pipeline.state {
             case .loadingModel(let progress):
-                VStack(spacing: 4) {
-                    ProgressView(value: progress)
-                        .padding(.horizontal, 8)
-                    Text("Modell wird geladen… \(Int(progress * 100))%")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                ModelLoadingView(progress: progress)
 
             case .recording:
-                WaveformView(levels: [pipeline.audioLevel])
-                    .padding(.horizontal, 8)
-                Text("Aufnahme läuft…")
-                    .font(.caption)
-                    .foregroundStyle(.red)
+                RecordingStatusView(audioLevel: pipeline.audioLevel)
 
             case .processing(let stage):
-                HStack(spacing: 4) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text(stage.localizedLabel)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if stage == .transcribing {
-                        Button { pipeline.cancelDictation() } label: {
-                            Image(systemName: "xmark")
-                                .font(.caption)
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.secondary)
-                    }
-                }
+                ProcessingStatusView(stage: stage, onCancel: pipeline.cancelDictation)
 
             case .pendingInClipboard:
                 Label("Text in Zwischenablage", systemImage: "doc.on.clipboard")
@@ -86,27 +62,10 @@ struct MenuBarView: View {
                     .foregroundStyle(.orange)
 
             case .error(let error):
-                VStack(spacing: 4) {
-                    Label(error.message, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                        .font(.caption)
-                        .help(error.message)
-                        .textSelection(.enabled)
-                    if error.isRecoverable {
-                        HStack(spacing: 8) {
-                            Button("Erneut versuchen") {
-                                pipeline.dismissError()
-                                Task { await pipeline.loadModelAndActivate() }
-                            }
-                            .font(.caption)
-
-                            Button("Einstellungen") {
-                                activateAndOpenSettings()
-                            }
-                            .font(.caption)
-                        }
-                    }
-                }
+                PipelineErrorView(error: error, onRetry: {
+                    pipeline.dismissError()
+                    Task { await pipeline.loadModelAndActivate() }
+                }, onSettings: activateAndOpenSettings)
 
             case .idle:
                 EmptyView()
@@ -168,14 +127,81 @@ struct MenuBarView: View {
     }
 
     private func activateAndOpenSettings() {
-        NSApp.setActivationPolicy(.regular)
-        openSettings()
-        DispatchQueue.main.async {
-            NSApp.activate()
-            for window in NSApp.windows where window.isVisible {
-                window.orderFrontRegardless()
+        WindowActivation.activateTemporarily { openSettings() }
+    }
+}
+
+// MARK: - Pipeline Status Sub-Views
+
+private struct ModelLoadingView: View {
+    let progress: Double
+
+    var body: some View {
+        VStack(spacing: 4) {
+            ProgressView(value: progress)
+                .padding(.horizontal, 8)
+            Text("Modell wird geladen… \(Int(progress * 100))%")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct RecordingStatusView: View {
+    let audioLevel: Float
+
+    var body: some View {
+        WaveformView(levels: [audioLevel])
+            .padding(.horizontal, 8)
+        Text("Aufnahme läuft…")
+            .font(.caption)
+            .foregroundStyle(.red)
+    }
+}
+
+private struct ProcessingStatusView: View {
+    let stage: PipelineState.ProcessingStage
+    let onCancel: () -> Void
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ProgressView()
+                .controlSize(.small)
+            Text(stage.localizedLabel)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if stage == .transcribing {
+                Button(action: onCancel) {
+                    Image(systemName: "xmark")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
             }
-            NSApp.setActivationPolicy(.accessory)
+        }
+    }
+}
+
+private struct PipelineErrorView: View {
+    let error: PipelineError
+    let onRetry: () -> Void
+    let onSettings: () -> Void
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Label(error.message, systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(.red)
+                .font(.caption)
+                .help(error.message)
+                .textSelection(.enabled)
+            if error.isRecoverable {
+                HStack(spacing: 8) {
+                    Button("Erneut versuchen", action: onRetry)
+                        .font(.caption)
+                    Button("Einstellungen", action: onSettings)
+                        .font(.caption)
+                }
+            }
         }
     }
 }

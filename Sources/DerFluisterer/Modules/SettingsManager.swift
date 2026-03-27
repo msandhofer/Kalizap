@@ -181,18 +181,17 @@ public final class SettingsManager {
     public var system: SystemSettings { didSet { persist(system, forKey: "system") } }
     public var update: UpdateSettings { didSet { persist(update, forKey: "update") } }
 
-    public private(set) var apiKeyStatus: APIKeyStatus = .missing
-
-    private let defaults: UserDefaults
-    private let keychain: any KeychainServiceProtocol
-    private let apiKeyValidator: any APIKeyValidating
+    public let apiKey: APIKeyManager
     private let launchAtLogin: any LaunchAtLoginProtocol
+    private let defaults: UserDefaults
+
+    /// Convenience accessor for backward compatibility.
+    public var apiKeyStatus: APIKeyStatus { apiKey.status }
 
     public init(defaults: UserDefaults = .standard, keychain: any KeychainServiceProtocol, apiKeyValidator: any APIKeyValidating, launchAtLogin: any LaunchAtLoginProtocol = NoOpLaunchAtLogin()) {
         self.defaults = defaults
-        self.keychain = keychain
-        self.apiKeyValidator = apiKeyValidator
         self.launchAtLogin = launchAtLogin
+        self.apiKey = APIKeyManager(keychain: keychain, validator: apiKeyValidator)
         self.audio = Self.load(from: defaults, forKey: "audio") ?? AudioSettings()
         self.hotkey = Self.load(from: defaults, forKey: "hotkey") ?? HotkeySettings()
         self.correction = Self.load(from: defaults, forKey: "correction") ?? CorrectionSettings()
@@ -200,24 +199,29 @@ public final class SettingsManager {
         self.update = Self.load(from: defaults, forKey: "update") ?? UpdateSettings()
     }
 
-    nonisolated private static let apiKeyAccount = "anthropic-api-key"
+    // MARK: - Delegating API Key methods (backward compatibility)
 
     public func setAPIKey(_ key: String) throws {
-        try keychain.store(key, for: Self.apiKeyAccount)
+        try apiKey.setKey(key)
     }
 
     public func resolveAPIKey() throws -> String {
-        try keychain.retrieve(for: Self.apiKeyAccount)
+        try apiKey.resolveKey()
     }
 
     nonisolated public func resolveAPIKeySendable() throws -> String {
-        try keychain.retrieve(for: Self.apiKeyAccount)
+        try apiKey.resolveKeySendable()
     }
 
     public func deleteAPIKey() throws {
-        try keychain.delete(for: Self.apiKeyAccount)
-        apiKeyStatus = .missing
+        try apiKey.deleteKey()
     }
+
+    public func validateAPIKey() async {
+        await apiKey.validate()
+    }
+
+    // MARK: - Launch at Login
 
     public func setAutoStart(_ enabled: Bool) throws {
         if enabled {
@@ -232,19 +236,7 @@ public final class SettingsManager {
         update.feedUnreachableWarning
     }
 
-    public func validateAPIKey() async {
-        guard let key = try? resolveAPIKey() else {
-            apiKeyStatus = .missing
-            return
-        }
-        apiKeyStatus = .validating
-        do {
-            try await apiKeyValidator.validate(apiKey: key)
-            apiKeyStatus = .valid
-        } catch {
-            apiKeyStatus = .invalid(error.localizedDescription)
-        }
-    }
+    // MARK: - Persistence
 
     private func persist<T: Encodable>(_ value: T, forKey key: String) {
         if let data = try? JSONEncoder().encode(value) {

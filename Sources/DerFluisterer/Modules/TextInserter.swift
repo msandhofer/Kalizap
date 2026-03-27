@@ -29,6 +29,18 @@ public struct InsertionResult: Sendable {
         self.targetApp = targetApp
         self.clipboardRestored = clipboardRestored
     }
+
+    public static func accessibility(targetApp: ActiveApp?) -> InsertionResult {
+        InsertionResult(outcome: .inserted(method: .accessibility), targetApp: targetApp, clipboardRestored: false)
+    }
+
+    public static func clipboard(targetApp: ActiveApp?) -> InsertionResult {
+        InsertionResult(outcome: .inserted(method: .clipboard), targetApp: targetApp, clipboardRestored: true)
+    }
+
+    public static func pending(targetApp: ActiveApp?) -> InsertionResult {
+        InsertionResult(outcome: .pendingInClipboard, targetApp: targetApp, clipboardRestored: false)
+    }
 }
 
 public struct ClipboardSnapshot: Sendable {

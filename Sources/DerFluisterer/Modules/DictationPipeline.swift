@@ -5,27 +5,42 @@ private let logger = Logger(subsystem: "com.derfluesterer", category: "Pipeline"
 
 /// File logger controlled by --verbose-log launch argument.
 public enum FileLog {
-    private static let url = FileManager.default.temporaryDirectory.appending(path: "derfluesterer-debug.log")
     public static let enabled = CommandLine.arguments.contains("--verbose-log")
+    private static let appender = FileAppender(
+        url: FileManager.default.temporaryDirectory.appending(path: "derfluesterer-debug.log")
+    )
 
     public static func log(_ message: String) {
         guard enabled else { return }
         let ts = ISO8601DateFormatter().string(from: Date())
-        let line = "[\(ts)] \(message)\n"
-        if let data = line.data(using: .utf8) {
-            if FileManager.default.fileExists(atPath: url.path) {
-                if let handle = try? FileHandle(forWritingTo: url) {
-                    handle.seekToEndOfFile()
-                    handle.write(data)
-                    handle.closeFile()
-                }
-            } else {
-                try? data.write(to: url)
-            }
-        }
+        appender.append("[\(ts)] \(message)\n")
     }
 
-    public static var path: String { url.path }
+    public static var path: String { appender.path }
+}
+
+/// Append-only file writer, extracted from FileLog for reuse and testability.
+public final class FileAppender: @unchecked Sendable {
+    private let url: URL
+
+    public init(url: URL) {
+        self.url = url
+    }
+
+    public var path: String { url.path }
+
+    public func append(_ text: String) {
+        guard let data = text.data(using: .utf8) else { return }
+        if FileManager.default.fileExists(atPath: url.path) {
+            if let handle = try? FileHandle(forWritingTo: url) {
+                handle.seekToEndOfFile()
+                handle.write(data)
+                handle.closeFile()
+            }
+        } else {
+            try? data.write(to: url)
+        }
+    }
 }
 
 extension ContinuousClock.Instant {
@@ -131,7 +146,7 @@ public final class DictationPipeline {
 
     public func loadModelAndActivate() async {
         let modelName = deps.settings.audio.whisperModel.rawValue
-        let language = TranscriptionLanguage(rawValue: deps.settings.audio.language.rawValue) ?? .german
+        let language = deps.settings.audio.language.transcriptionLanguage
         FileLog.log("loadModelAndActivate START — model=\(modelName) language=\(language)")
         FileLog.log("Task.isCancelled=\(Task.isCancelled)")
         state = .loadingModel(progress: 0)
@@ -176,7 +191,7 @@ public final class DictationPipeline {
     }
 
     public func deactivate() {
-        cancelDictation()
+        shutdown()
         deps.hotkey.stop()
         Task { await deps.recorder.stopRecording() }
     }
@@ -190,6 +205,13 @@ public final class DictationPipeline {
     }
 
     public func cancelDictation() {
+        shutdown()
+    }
+
+    /// Deterministic shutdown sequence shared by deactivate() and cancelDictation().
+    /// Order: 1) flag cancel 2) stop watchdog 3) stop streaming/metering
+    /// 4) cancel processing chain 5) cancel transcriber 6) clear buffers 7) reset state
+    private func shutdown() {
         cancelled = true
         isRecording = false
         recordingWatchdog?.cancel()
@@ -293,48 +315,47 @@ public final class DictationPipeline {
         collectedChunks = []
         return CollectedAudioBuffer(
             samples: chunks.flatMap { $0.samples },
-            sampleRate: chunks.first?.sampleRate ?? 16000,
+            sampleRate: chunks.first?.sampleRate ?? AudioProcessingUtils.whisperSampleRate,
             totalDuration: chunks.reduce(0.0) { $0 + $1.duration }
         )
     }
 
     private func buildCorrectionConfig() -> CorrectionConfig {
-        let correctionSettings = deps.settings.correction
-        return CorrectionConfig(
-            from: correctionSettings,
-            resolvedContextMode: resolveContextMode(correctionSettings)
+        deps.settings.correction.buildCorrectionConfig(
+            frontmostApp: deps.appDetector.frontmostApp()
         )
     }
 
     private func startAudioProcessing() {
         let recorder = deps.recorder
 
-        // Single consumer of audioStream: collects chunks AND feeds transcriber
         streamingTask = Task { [weak self] in
             guard let self else { return }
             let config = TranscriptionConfig(language: self.deps.settings.audio.language)
-
-            // Bridge AsyncThrowingStream to AsyncStream, collecting chunks along the way
-            let audioStream = AsyncStream<AudioChunk> { continuation in
-                Task { [weak self] in
-                    do {
-                        for try await chunk in recorder.audioStream {
-                            // Collect for batch fallback
-                            await MainActor.run { self?.collectedChunks.append(chunk) }
-                            // Forward to transcriber
-                            continuation.yield(chunk)
-                        }
-                    } catch {
-                        // Stream ended (device lost, etc.)
-                    }
-                    continuation.finish()
-                }
-            }
+            let audioStream = self.bridgeAudioStream(from: recorder)
 
             let results = self.deps.transcriber.transcribe(audioStream, config: config)
             for await result in results {
                 if Task.isCancelled { return }
                 await MainActor.run { self.streamingText = result.text }
+            }
+        }
+    }
+
+    /// Bridges the recorder's AsyncThrowingStream to an AsyncStream,
+    /// collecting chunks for batch fallback along the way.
+    private func bridgeAudioStream(from recorder: any AudioCapturing) -> AsyncStream<AudioChunk> {
+        AsyncStream<AudioChunk> { continuation in
+            Task { [weak self] in
+                do {
+                    for try await chunk in recorder.audioStream {
+                        await MainActor.run { self?.collectedChunks.append(chunk) }
+                        continuation.yield(chunk)
+                    }
+                } catch {
+                    // Stream ended (device lost, etc.)
+                }
+                continuation.finish()
             }
         }
     }
@@ -359,14 +380,29 @@ public final class DictationPipeline {
             return
         }
 
+        // 1. Transcribe
+        guard let transcription = await performTranscription(job) else { return }
+
+        // 2. Correct
+        let correctedText = await applyCorrection(job, transcription: transcription)
+        guard !cancelled else { return }
+
+        // 3. Insert
+        let insertionResult = await insertText(correctedText)
+        guard !cancelled else { return }
+
+        // 4. Persist + finalize
+        await persistResult(job, rawText: transcription.text, correctedText: correctedText, insertionResult: insertionResult)
+    }
+
+    private func performTranscription(_ job: DictationJob) async -> TranscriptionResult? {
         deps.corrector.updateConfig(job.correctionConfig)
 
-        // Transcribe: use streaming result if available, otherwise batch
         let useStreaming = !job.streamingResult.isEmpty
         FileLog.log("process — transcribing (useStreaming=\(useStreaming))")
         updateStateIfNotRecording(.processing(stage: .transcribing))
-        let transcription: TranscriptionResult?
 
+        let transcription: TranscriptionResult?
         if useStreaming {
             transcription = .final(FinalTranscription(
                 text: job.streamingResult,
@@ -382,34 +418,32 @@ public final class DictationPipeline {
             if !cancelled {
                 state = .error(PipelineError(message: "Transcription failed", isRecoverable: true))
             }
-            return
+            return nil
         }
         FileLog.log("process — transcribed: \(transcription.text.prefix(50))...")
+        return transcription
+    }
 
-        // Correct
+    private func applyCorrection(_ job: DictationJob, transcription: TranscriptionResult) async -> String {
         FileLog.log("process — correcting")
         updateStateIfNotRecording(.processing(stage: .correcting))
         let correctionOutcome = await deps.corrector.correct(transcription)
+        FileLog.log("process — corrected: \(correctionOutcome.text.prefix(50))...")
+        return correctionOutcome.text
+    }
 
-        guard !cancelled else { return }
-
-        let rawText = transcription.text
-        let correctedText = correctionOutcome.text
-        FileLog.log("process — corrected: \(correctedText.prefix(50))...")
-
-        // Insert
+    private func insertText(_ text: String) async -> InsertionResult {
         FileLog.log("process — inserting")
         updateStateIfNotRecording(.processing(stage: .inserting))
-        let insertionResult = await deps.inserter.insert(correctedText)
-        FileLog.log("process — inserted: \(insertionResult.outcome)")
+        let result = await deps.inserter.insert(text)
+        FileLog.log("process — inserted: \(result.outcome)")
+        return result
+    }
 
-        guard !cancelled else { return }
-
-        // Measure latency (key-release → insertion complete)
+    private func persistResult(_ job: DictationJob, rawText: String, correctedText: String, insertionResult: InsertionResult) async {
         let measuredLatencyMs = job.stopTimestamp.millisecondsSinceNow()
         latencyMs = measuredLatencyMs
 
-        // Persist
         let entry = DictationEntry(
             id: UUID(),
             timestamp: Date(),
@@ -434,17 +468,6 @@ public final class DictationPipeline {
         if !isRecording {
             state = newState
         }
-    }
-
-    private func resolveContextMode(_ settings: CorrectionSettings) -> ContextMode {
-        guard settings.contextMode == .auto else {
-            return settings.contextMode
-        }
-        if let app = deps.appDetector.frontmostApp(),
-           let appMode = settings.appMapping[app.bundleIdentifier] {
-            return appMode
-        }
-        return .neutral
     }
 
     private func transcribeBatch(buffer: CollectedAudioBuffer, language: SupportedLanguage) async -> TranscriptionResult? {

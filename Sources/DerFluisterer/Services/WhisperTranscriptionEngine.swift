@@ -1,11 +1,10 @@
 import Foundation
-import Accelerate
 
 public final class WhisperTranscriptionEngine: TranscriptionEngine, @unchecked Sendable {
     private let backend: WhisperBackend
-    private var cancelled = false
     private var transcriptionTask: Task<Void, Never>?
     private var activeContinuation: AsyncStream<TranscriptionResult>.Continuation?
+    private var continuationFinished = false
 
     public init(backend: WhisperBackend) {
         self.backend = backend
@@ -22,35 +21,32 @@ public final class WhisperTranscriptionEngine: TranscriptionEngine, @unchecked S
         _ audioChunks: AsyncStream<AudioChunk>,
         config: TranscriptionConfig
     ) -> AsyncStream<TranscriptionResult> {
-        cancelled = false
+        cancel()
 
         return AsyncStream { continuation in
             self.activeContinuation = continuation
+            self.continuationFinished = false
             let backend = self.backend
 
             self.transcriptionTask = Task { [weak self] in
+                defer { self?.finishContinuation() }
+
                 var allSamples: [Float] = []
                 FileLog.log("TranscriptionEngine — collecting audio chunks")
                 for await chunk in audioChunks {
-                    guard self?.cancelled != true else {
+                    guard !Task.isCancelled else {
                         FileLog.log("TranscriptionEngine — cancelled during chunk collection")
-                        continuation.finish()
-                        self?.activeContinuation = nil
                         return
                     }
                     allSamples.append(contentsOf: chunk.samples)
                 }
 
-                FileLog.log("TranscriptionEngine — collected \(allSamples.count) samples, cancelled=\(self?.cancelled ?? true)")
-                guard self?.cancelled != true, !allSamples.isEmpty else {
-                    FileLog.log("TranscriptionEngine — bailing out (cancelled or empty)")
-                    continuation.finish()
-                    self?.activeContinuation = nil
+                guard !Task.isCancelled, !allSamples.isEmpty else {
+                    FileLog.log("TranscriptionEngine — bailing out (cancelled=\(Task.isCancelled), empty=\(allSamples.isEmpty))")
                     return
                 }
 
-                // Peak-normalize to improve transcription quality
-                DeepFilterProcessor.peakNormalize(&allSamples)
+                AudioProcessingUtils.peakNormalize(&allSamples)
 
                 do {
                     let start = ContinuousClock.now
@@ -63,10 +59,8 @@ public final class WhisperTranscriptionEngine: TranscriptionEngine, @unchecked S
                     let elapsed = ContinuousClock.now - start
                     FileLog.log("TranscriptionEngine — backend returned in \(elapsed), text=\(result.text.prefix(50))")
 
-                    guard self?.cancelled != true else {
+                    guard !Task.isCancelled else {
                         FileLog.log("TranscriptionEngine — cancelled after transcription")
-                        continuation.finish()
-                        self?.activeContinuation = nil
                         return
                     }
 
@@ -79,18 +73,20 @@ public final class WhisperTranscriptionEngine: TranscriptionEngine, @unchecked S
                 } catch {
                     FileLog.log("TranscriptionEngine — ERROR: \(error)")
                 }
-
-                continuation.finish()
-                self?.activeContinuation = nil
             }
         }
     }
 
     public func cancel() {
         FileLog.log("TranscriptionEngine — cancel() called")
-        cancelled = true
         transcriptionTask?.cancel()
         transcriptionTask = nil
+        finishContinuation()
+    }
+
+    private func finishContinuation() {
+        guard !continuationFinished else { return }
+        continuationFinished = true
         activeContinuation?.finish()
         activeContinuation = nil
     }

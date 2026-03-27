@@ -67,7 +67,7 @@ final class SettingsManagerDefaultsTests: XCTestCase {
         XCTAssertEqual(WhisperModel.base.rawValue, "base")
         XCTAssertEqual(WhisperModel.small.rawValue, "small")
         XCTAssertEqual(WhisperModel.largeV3.rawValue, "large-v3")
-        XCTAssertEqual(WhisperModel.largeV3Turbo.rawValue, "openai_whisper-large-v3_turbo")
+        XCTAssertEqual(WhisperModel.largeV3Turbo.rawValue, "large-v3_turbo")
     }
 
     func test_newSettingsManager_hasCorrectHotkeyDefaults() {

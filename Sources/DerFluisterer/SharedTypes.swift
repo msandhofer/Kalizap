@@ -2,6 +2,13 @@ import Foundation
 
 public enum SupportedLanguage: String, Codable, CaseIterable, Sendable {
     case de, en
+
+    public var transcriptionLanguage: TranscriptionLanguage {
+        switch self {
+        case .de: .german
+        case .en: .english
+        }
+    }
 }
 
 public enum ContextMode: String, Codable, CaseIterable, Sendable {

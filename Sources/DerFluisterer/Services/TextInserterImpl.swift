@@ -30,11 +30,7 @@ public final class TextInserterImpl: TextInserting, @unchecked Sendable {
             do {
                 try await accessibility.insertViaAccessibility(text: text)
                 FileLog.log("insert — AX insert + verification succeeded")
-                return InsertionResult(
-                    outcome: .inserted(method: .accessibility),
-                    targetApp: targetApp,
-                    clipboardRestored: false
-                )
+                return .accessibility(targetApp: targetApp)
             } catch {
                 FileLog.log("insert — AX failed (\(error)), falling through to clipboard")
             }
@@ -48,19 +44,11 @@ public final class TextInserterImpl: TextInserting, @unchecked Sendable {
             try await Task.sleep(for: restoreDelay)
             try await clipboard.restore(from: snapshot)
             FileLog.log("insert — clipboard method succeeded")
-            return InsertionResult(
-                outcome: .inserted(method: .clipboard),
-                targetApp: targetApp,
-                clipboardRestored: true
-            )
+            return .clipboard(targetApp: targetApp)
         } catch {
             FileLog.log("insert — clipboard method failed (\(error)), leaving text in clipboard")
             try? await clipboard.set(text: text)
-            return InsertionResult(
-                outcome: .pendingInClipboard,
-                targetApp: targetApp,
-                clipboardRestored: false
-            )
+            return .pending(targetApp: targetApp)
         }
     }
 }

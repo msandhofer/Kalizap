@@ -74,67 +74,8 @@ struct DerFluistererApp: App {
 
     @MainActor
     private func startPipeline() async {
-        let modelRawValue = settings.audio.whisperModel.rawValue
-        FileLog.log("startPipeline — model=\(modelRawValue) whisperModel=\(settings.audio.whisperModel)")
-        let appDetector = NSWorkspaceAppDetector()
-        let hotkey = HotkeyManagerImpl(configuration: settings.hotkey.configuration)
-
-        var noiseSuppressor: DeepFilterProcessor? = nil
-        if settings.audio.noiseSuppressionEnabled {
-            if let modelURL = Bundle.module.url(forResource: "DeepFilterNet3_onnx", withExtension: "tar.gz") {
-                // Load on background thread — df_create is CPU-intensive (~30s)
-                noiseSuppressor = await Task.detached(priority: .userInitiated) {
-                    do {
-                        let processor = try DeepFilterProcessor(modelPath: modelURL.path)
-                        FileLog.log("startPipeline — DeepFilterNet3 loaded")
-                        return processor
-                    } catch {
-                        FileLog.log("startPipeline — DeepFilterNet3 load failed: \(error)")
-                        return nil
-                    }
-                }.value
-            } else {
-                FileLog.log("startPipeline — DeepFilterNet3 model not found in bundle")
-            }
-        }
-
-        let recorder = AudioRecorderImpl(noiseSuppressor: noiseSuppressor)
-        let backend = WhisperKitBackend(model: modelRawValue)
-        let transcriber = WhisperTranscriptionEngine(backend: backend)
-        let apiKeyProvider: @Sendable () throws -> String = { [settings] in
-            try settings.resolveAPIKeySendable()
-        }
-        let transport = ClaudeAPITransport.makeTransport(apiKeyProvider: apiKeyProvider)
-        let corrector = TextCorrectorImpl(
-            config: CorrectionConfig(),
-            transport: transport,
-            apiKeyProvider: apiKeyProvider
-        )
-        let inserter = TextInserterImpl(
-            clipboard: NSPasteboardClipboardManager(),
-            keystroke: CGEventKeystrokeSimulator(),
-            accessibility: AXAccessibilityInserter(),
-            appDetector: appDetector
-        )
-        let sound = SoundPlayer(
-            backend: SystemSoundBackend(),
-            soundsEnabled: settings.audio.soundsEnabled
-        )
-
-        let deps = PipelineDependencies(
-            hotkey: hotkey,
-            recorder: recorder,
-            metering: recorder,
-            transcriber: transcriber,
-            corrector: corrector,
-            inserter: inserter,
-            appDetector: appDetector,
-            store: store,
-            sound: sound,
-            settings: settings
-        )
-
-        let p = DictationPipeline(dependencies: deps)
+        FileLog.log("startPipeline — model=\(settings.audio.whisperModel.rawValue)")
+        let p = await PipelineFactory.makePipeline(settings: settings, store: store)
         pipeline = p
         await p.loadModelAndActivate()
     }
