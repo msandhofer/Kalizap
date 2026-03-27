@@ -1,0 +1,5 @@
+module CDeepFilter {
+    header "deep_filter.h"
+    link "df"
+    export *
+}

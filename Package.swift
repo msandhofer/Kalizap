@@ -16,6 +16,18 @@ let package = Package(
     ],
     targets: [
         .target(
+            name: "CDeepFilter",
+            path: "Sources/CDeepFilter",
+            exclude: ["lib"],
+            publicHeadersPath: "include",
+            linkerSettings: [
+                .unsafeFlags([
+                    "-L", "Sources/CDeepFilter/lib",
+                    "-ldf",
+                ]),
+            ]
+        ),
+        .target(
             name: "DerFluisterer",
             dependencies: [
                 "WhisperKit",
@@ -56,6 +68,11 @@ let package = Package(
             name: "WhisperModelTestCLI",
             dependencies: ["DerFluisterer", "WhisperKit"],
             path: "Tools/WhisperModelTestCLI"
+        ),
+        .executableTarget(
+            name: "VoiceProcessingTestCLI",
+            dependencies: ["DerFluisterer", "CDeepFilter"],
+            path: "Tools/VoiceProcessingTestCLI"
         ),
         .testTarget(
             name: "DerFluistererTests",
