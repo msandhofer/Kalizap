@@ -6,6 +6,7 @@ struct MenuBarView: View {
     var pipeline: DictationPipeline?
     var updater: SparkleUpdater?
     var historyVM: HistoryViewModel
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         VStack(spacing: 8) {
@@ -26,8 +27,8 @@ struct MenuBarView: View {
             }
             .disabled(updater?.canCheckForUpdates != true)
 
-            SettingsLink {
-                Text("Einstellungen…")
+            Button("Einstellungen…") {
+                activateAndOpenSettings()
             }
             .keyboardShortcut(",")
 
@@ -99,8 +100,8 @@ struct MenuBarView: View {
                             }
                             .font(.caption)
 
-                            SettingsLink {
-                                Text("Einstellungen")
+                            Button("Einstellungen") {
+                                activateAndOpenSettings()
                             }
                             .font(.caption)
                         }
@@ -163,6 +164,18 @@ struct MenuBarView: View {
                     .buttonStyle(.plain)
                 }
             }
+        }
+    }
+
+    private func activateAndOpenSettings() {
+        NSApp.setActivationPolicy(.regular)
+        openSettings()
+        DispatchQueue.main.async {
+            NSApp.activate()
+            for window in NSApp.windows where window.isVisible {
+                window.orderFrontRegardless()
+            }
+            NSApp.setActivationPolicy(.accessory)
         }
     }
 }
