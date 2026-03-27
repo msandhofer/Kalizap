@@ -27,11 +27,18 @@ public final class AXAccessibilityInserter: AccessibilityInserting, @unchecked S
         }
 
         let axElement = element as! AXUIElement
-        // Use kAXSelectedTextAttribute to insert at cursor position
-        // (replaces current selection, or inserts if no selection — never overwrites entire field)
+
         let setResult = AXUIElementSetAttributeValue(axElement, kAXSelectedTextAttribute as CFString, text as CFTypeRef)
         guard setResult == .success else {
             throw AccessibilityInsertionError.setValueFailed(setResult)
+        }
+
+        // Verify via read-back: some apps (e.g. iTerm2) report success but silently discard the write
+        var value: AnyObject?
+        AXUIElementCopyAttributeValue(axElement, kAXValueAttribute as CFString, &value)
+        let fieldContent = value as? String
+        guard fieldContent?.contains(text) == true else {
+            throw AccessibilityInsertionError.verificationFailed
         }
     }
 }
@@ -39,4 +46,5 @@ public final class AXAccessibilityInserter: AccessibilityInserting, @unchecked S
 public enum AccessibilityInsertionError: Error {
     case noFocusedElement
     case setValueFailed(AXError)
+    case verificationFailed
 }

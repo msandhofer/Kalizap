@@ -23,35 +23,38 @@ public final class TextInserterImpl: TextInserting, @unchecked Sendable {
 
     public func insert(_ text: String) async -> InsertionResult {
         let targetApp = appDetector.frontmostApp()
+        FileLog.log("insert — target: \(targetApp?.localizedName ?? "nil") (\(targetApp?.bundleIdentifier ?? "nil"))")
 
-        // Prefer accessibility API when a text field is focused — avoids clipboard issues
+        // Step 1: Accessibility API — insert + verify via read-back
         if accessibility.hasTextFieldFocus() {
             do {
                 try await accessibility.insertViaAccessibility(text: text)
+                FileLog.log("insert — AX insert + verification succeeded")
                 return InsertionResult(
                     outcome: .inserted(method: .accessibility),
                     targetApp: targetApp,
                     clipboardRestored: false
                 )
             } catch {
-                // Fall through to clipboard method
+                FileLog.log("insert — AX failed (\(error)), falling through to clipboard")
             }
         }
 
-        // Clipboard-based insertion
+        // Step 2: Clipboard + Cmd+V
         do {
             let snapshot = try await clipboard.backup()
             try await clipboard.set(text: text)
             try await keystroke.simulatePaste()
             try await Task.sleep(for: restoreDelay)
             try await clipboard.restore(from: snapshot)
+            FileLog.log("insert — clipboard method succeeded")
             return InsertionResult(
                 outcome: .inserted(method: .clipboard),
                 targetApp: targetApp,
                 clipboardRestored: true
             )
         } catch {
-            // Last resort: leave text in clipboard for manual paste
+            FileLog.log("insert — clipboard method failed (\(error)), leaving text in clipboard")
             try? await clipboard.set(text: text)
             return InsertionResult(
                 outcome: .pendingInClipboard,

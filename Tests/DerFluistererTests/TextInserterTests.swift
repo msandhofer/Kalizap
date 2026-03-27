@@ -23,60 +23,53 @@ final class TextInserterTests: XCTestCase {
         return (sut, clipboard, keystroke, accessibility, appDetector)
     }
 
-    // MARK: - Cycle 1: Happy path clipboard insertion
+    // MARK: - AX insertion (preferred path)
 
-    func test_insert_happyPath_backupsClipboardPastesAndRestores() async {
-        let (sut, clipboard, keystroke, _, _) = makeSUT()
+    func test_insert_axSucceeds_usesAccessibilityMethod() async {
+        let accessibility = MockAccessibilityInserter(hasTextField: true)
+        let (sut, clipboard, keystroke, _, _) = makeSUT(accessibility: accessibility)
 
         let result = await sut.insert("Hello World")
 
+        XCTAssertEqual(result.outcome, .inserted(method: .accessibility))
+        XCTAssertEqual(accessibility.insertedText, "Hello World")
+        XCTAssertFalse(result.clipboardRestored)
+        // Clipboard should not be touched
+        XCTAssertFalse(clipboard.backedUp)
+        XCTAssertFalse(keystroke.pasteSimulated)
+    }
+
+    // MARK: - AX fails → clipboard fallback
+
+    func test_insert_axVerificationFails_fallsBackToClipboard() async {
+        let accessibility = MockAccessibilityInserter(hasTextField: true)
+        accessibility.insertError = AccessibilityInsertionError.verificationFailed
+        let (sut, clipboard, keystroke, _, _) = makeSUT(accessibility: accessibility)
+
+        let result = await sut.insert("verified text")
+
         XCTAssertEqual(result.outcome, .inserted(method: .clipboard))
         XCTAssertTrue(result.clipboardRestored)
-        XCTAssertEqual(result.targetApp?.bundleIdentifier, "com.apple.TextEdit")
         XCTAssertTrue(clipboard.backedUp)
-        XCTAssertEqual(clipboard.setText, "Hello World")
+        XCTAssertEqual(clipboard.setText, "verified text")
         XCTAssertTrue(keystroke.pasteSimulated)
         XCTAssertNotNil(clipboard.restoredSnapshot)
     }
 
-    // MARK: - Cycle 2: Active app detection
+    func test_insert_noTextFieldFocus_usesClipboard() async {
+        let accessibility = MockAccessibilityInserter(hasTextField: false)
+        let (sut, clipboard, keystroke, _, _) = makeSUT(accessibility: accessibility)
 
-    func test_insert_noFrontmostApp_targetAppIsNil() async {
-        let (sut, _, _, _, _) = makeSUT(appDetector: MockAppDetector(app: nil))
+        let result = await sut.insert("clipboard text")
 
-        let result = await sut.insert("text")
-
-        XCTAssertNil(result.targetApp)
+        XCTAssertEqual(result.outcome, .inserted(method: .clipboard))
+        XCTAssertTrue(result.clipboardRestored)
+        XCTAssertTrue(clipboard.backedUp)
+        XCTAssertEqual(clipboard.setText, "clipboard text")
+        XCTAssertTrue(keystroke.pasteSimulated)
     }
 
-    // MARK: - Cycle 3: Accessibility fallback
-
-    func test_insert_clipboardFails_fallsBackToAccessibility() async {
-        let clipboard = MockClipboardManager()
-        clipboard.setError = NSError(domain: "test", code: 1)
-        let accessibility = MockAccessibilityInserter(hasTextField: true)
-        let (sut, _, _, _, _) = makeSUT(clipboard: clipboard, accessibility: accessibility)
-
-        let result = await sut.insert("fallback text")
-
-        XCTAssertEqual(result.outcome, .inserted(method: .accessibility))
-        XCTAssertEqual(accessibility.insertedText, "fallback text")
-        XCTAssertFalse(result.clipboardRestored)
-    }
-
-    func test_insert_pasteFails_fallsBackToAccessibility() async {
-        let keystroke = MockKeystrokeSimulator()
-        keystroke.simulateError = NSError(domain: "test", code: 1)
-        let accessibility = MockAccessibilityInserter(hasTextField: true)
-        let (sut, _, _, _, _) = makeSUT(keystroke: keystroke, accessibility: accessibility)
-
-        let result = await sut.insert("paste failed")
-
-        XCTAssertEqual(result.outcome, .inserted(method: .accessibility))
-        XCTAssertEqual(accessibility.insertedText, "paste failed")
-    }
-
-    // MARK: - Cycle 4: pendingInClipboard
+    // MARK: - pendingInClipboard
 
     func test_insert_noTextFieldAndClipboardFails_pendingInClipboard() async {
         let clipboard = MockClipboardManager()
@@ -90,10 +83,37 @@ final class TextInserterTests: XCTestCase {
         XCTAssertFalse(result.clipboardRestored)
     }
 
-    // MARK: - Cycle 5: Clipboard preserved after insertion
+    func test_insert_axFailsAndClipboardFails_pendingInClipboard() async {
+        let clipboard = MockClipboardManager()
+        clipboard.backupError = NSError(domain: "test", code: 1)
+        let accessibility = MockAccessibilityInserter(hasTextField: true)
+        accessibility.insertError = AccessibilityInsertionError.verificationFailed
+        let (sut, _, _, _, _) = makeSUT(clipboard: clipboard, accessibility: accessibility)
+
+        let result = await sut.insert("both fail")
+
+        XCTAssertEqual(result.outcome, .pendingInClipboard)
+        XCTAssertFalse(result.clipboardRestored)
+    }
+
+    // MARK: - Active app detection
+
+    func test_insert_noFrontmostApp_targetAppIsNil() async {
+        let (sut, _, _, _, _) = makeSUT(
+            accessibility: MockAccessibilityInserter(hasTextField: false),
+            appDetector: MockAppDetector(app: nil)
+        )
+
+        let result = await sut.insert("text")
+
+        XCTAssertNil(result.targetApp)
+    }
+
+    // MARK: - Clipboard restore
 
     func test_insert_clipboardSnapshotIsRestoredWithOriginalData() async {
-        let (sut, clipboard, _, _, _) = makeSUT()
+        let accessibility = MockAccessibilityInserter(hasTextField: false)
+        let (sut, clipboard, _, _, _) = makeSUT(accessibility: accessibility)
 
         _ = await sut.insert("some text")
 
