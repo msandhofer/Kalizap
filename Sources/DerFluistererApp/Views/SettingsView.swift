@@ -4,12 +4,13 @@ import DerFluisterer
 
 struct SettingsView: View {
     @Bindable var settings: SettingsManager
+    var updater: SparkleUpdater?
 
     var body: some View {
         ScrollView {
             Form {
                 GeneralSettingsSection(settings: settings)
-                UpdateSettingsSection(settings: settings)
+                UpdateSettingsSection(settings: settings, updater: updater)
                 AudioSettingsSection(settings: settings)
                 CorrectionSettingsSection(settings: settings)
                 APIKeySettingsSection(settings: settings)
@@ -63,6 +64,7 @@ struct GeneralSettingsSection: View {
 
 struct UpdateSettingsSection: View {
     @Bindable var settings: SettingsManager
+    var updater: SparkleUpdater?
 
     var body: some View {
         Section("Updates") {
@@ -70,6 +72,11 @@ struct UpdateSettingsSection: View {
 
             Toggle("Updates automatisch im Hintergrund installieren", isOn: $settings.update.silentAutoUpdate)
                 .disabled(!settings.update.autoCheckEnabled)
+
+            Button("Jetzt nach Updates suchen…") {
+                updater?.checkForUpdates()
+            }
+            .disabled(updater?.canCheckForUpdates != true)
 
             if let warning = settings.feedUnreachableWarning {
                 Label(warning, systemImage: "exclamationmark.triangle.fill")
@@ -220,9 +227,12 @@ struct APIKeySettingsSection: View {
             }
 
             apiKeyStatusLabel
+
+            Toggle("Hinweis bei fehlender Korrektur anzeigen", isOn: $settings.correction.showAPIKeyNotification)
+                .font(.caption)
         }
         .onAppear {
-            apiKeyInput = (try? settings.resolveAPIKey()) ?? ""
+            apiKeyInput = settings.apiKey.cachedKey ?? ""
         }
     }
 

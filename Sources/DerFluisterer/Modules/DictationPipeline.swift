@@ -116,6 +116,9 @@ public final class DictationPipeline {
     public private(set) var streamingText: String = ""
     public private(set) var audioLevel: Float = 0
 
+    /// Called when correction falls back to raw text due to API error (e.g. missing/invalid key).
+    public var onCorrectionFallback: (() -> Void)?
+
     private static let recordingTimeout: Duration = .seconds(120)
 
     private let deps: PipelineDependencies
@@ -384,14 +387,26 @@ public final class DictationPipeline {
         guard let transcription = await performTranscription(job) else { return }
 
         // 2. Correct
-        let correctedText = await applyCorrection(job, transcription: transcription)
+        let correctionOutcome = await applyCorrection(job, transcription: transcription)
         guard !cancelled else { return }
 
-        // 3. Insert
+        let correctedText = correctionOutcome.text
+        guard !correctedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            FileLog.log("process — empty transcription, skipping insert + persist")
+            updateStateIfNotRecording(.idle)
+            return
+        }
+
+        // 3. Notify on correction fallback (API error, retry exhausted, etc.)
+        if case .fallbackRaw = correctionOutcome {
+            onCorrectionFallback?()
+        }
+
+        // 4. Insert
         let insertionResult = await insertText(correctedText)
         guard !cancelled else { return }
 
-        // 4. Persist + finalize
+        // 5. Persist + finalize
         await persistResult(job, rawText: transcription.text, correctedText: correctedText, insertionResult: insertionResult)
     }
 
@@ -424,12 +439,12 @@ public final class DictationPipeline {
         return transcription
     }
 
-    private func applyCorrection(_ job: DictationJob, transcription: TranscriptionResult) async -> String {
+    private func applyCorrection(_ job: DictationJob, transcription: TranscriptionResult) async -> CorrectionOutcome {
         FileLog.log("process — correcting")
         updateStateIfNotRecording(.processing(stage: .correcting))
-        let correctionOutcome = await deps.corrector.correct(transcription)
-        FileLog.log("process — corrected: \(correctionOutcome.text.prefix(50))...")
-        return correctionOutcome.text
+        let outcome = await deps.corrector.correct(transcription)
+        FileLog.log("process — corrected: \(outcome.text.prefix(50))...")
+        return outcome
     }
 
     private func insertText(_ text: String) async -> InsertionResult {

@@ -22,20 +22,27 @@ struct MenuBarView: View {
 
             Divider()
 
-            Button("Nach Updates suchen…") {
-                updater?.checkForUpdates()
-            }
-            .disabled(updater?.canCheckForUpdates != true)
+            HStack {
+                Button {
+                    activateAndOpenSettings()
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .keyboardShortcut(",")
+                .help("Einstellungen")
 
-            Button("Einstellungen…") {
-                activateAndOpenSettings()
-            }
-            .keyboardShortcut(",")
+                Spacer()
 
-            Button("Beenden") {
-                NSApplication.shared.terminate(nil)
+                Button {
+                    NSApplication.shared.terminate(nil)
+                } label: {
+                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                }
+                .keyboardShortcut("q")
+                .help("Beenden")
             }
-            .keyboardShortcut("q")
+            .buttonStyle(.plain)
+            .font(.title3)
         }
         .padding(8)
         .task {
@@ -75,22 +82,36 @@ struct MenuBarView: View {
 
     @ViewBuilder
     private var apiKeyStatusView: some View {
-        switch settings.apiKeyStatus {
-        case .missing:
-            Label("API-Key fehlt", systemImage: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
-                .font(.caption)
-        case .validating:
-            Label("API-Key wird geprüft…", systemImage: "arrow.triangle.2.circlepath")
-                .font(.caption)
-        case .valid:
-            Label("API-Key gültig", systemImage: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-                .font(.caption)
-        case .invalid(let message):
-            Label("API-Key ungültig: \(message)", systemImage: "xmark.circle.fill")
-                .foregroundStyle(.red)
-                .font(.caption)
+        HStack(spacing: 4) {
+            switch settings.apiKeyStatus {
+            case .missing:
+                Label("API-Key fehlt", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .font(.caption)
+            case .validating:
+                Label("API-Key wird geprüft…", systemImage: "arrow.triangle.2.circlepath")
+                    .font(.caption)
+            case .valid:
+                Label("API-Key gültig", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                    .font(.caption)
+            case .invalid(let message):
+                Label("API-Key ungültig: \(message)", systemImage: "xmark.circle.fill")
+                    .foregroundStyle(.red)
+                    .font(.caption)
+            }
+
+            if settings.apiKeyStatus != .validating {
+                Button {
+                    Task { await settings.validateAPIKey() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("API-Key erneut prüfen")
+            }
         }
     }
 
@@ -196,11 +217,18 @@ private struct PipelineErrorView: View {
                 .textSelection(.enabled)
             if error.isRecoverable {
                 HStack(spacing: 8) {
-                    Button("Erneut versuchen", action: onRetry)
-                        .font(.caption)
-                    Button("Einstellungen", action: onSettings)
-                        .font(.caption)
+                    Button(action: onRetry) {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .help("Erneut versuchen")
+
+                    Button(action: onSettings) {
+                        Image(systemName: "gearshape")
+                    }
+                    .help("Einstellungen")
                 }
+                .buttonStyle(.plain)
+                .font(.caption)
             }
         }
     }

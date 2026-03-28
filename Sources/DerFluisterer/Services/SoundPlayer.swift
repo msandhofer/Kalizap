@@ -11,34 +11,39 @@ public protocol SoundBackend: Sendable {
 
 public final class SoundPlayer: SoundPlaying, @unchecked Sendable {
     private let backend: SoundBackend
-    public var soundsEnabled: Bool
+    private let isEnabled: () -> Bool
 
     public init(backend: SoundBackend, soundsEnabled: Bool) {
         self.backend = backend
-        self.soundsEnabled = soundsEnabled
+        self.isEnabled = { soundsEnabled }
+    }
+
+    public init(backend: SoundBackend, isEnabled: @escaping () -> Bool) {
+        self.backend = backend
+        self.isEnabled = isEnabled
     }
 
     // MARK: - SoundPlaying (async, used by DictationPipeline)
 
     public func playStartSound() async {
-        guard soundsEnabled else { return }
+        guard isEnabled() else { return }
         backend.play(.recordingStarted)
     }
 
     public func playStopSound() async {
-        guard soundsEnabled else { return }
+        guard isEnabled() else { return }
         backend.play(.recordingStopped)
     }
 
     // MARK: - Synchronous (used by RecordingCoordinator)
 
     public func playRecordingStarted() {
-        guard soundsEnabled else { return }
+        guard isEnabled() else { return }
         backend.play(.recordingStarted)
     }
 
     public func playRecordingStopped() {
-        guard soundsEnabled else { return }
+        guard isEnabled() else { return }
         backend.play(.recordingStopped)
     }
 }

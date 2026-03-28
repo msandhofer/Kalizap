@@ -78,6 +78,11 @@ let package = Package(
             dependencies: ["DerFluisterer", "CDeepFilter"],
             path: "Tools/VoiceProcessingTestCLI"
         ),
+        .executableTarget(
+            name: "ToastTestCLI",
+            dependencies: [],
+            path: "Tools/ToastTestCLI"
+        ),
         .testTarget(
             name: "DerFluistererTests",
             dependencies: ["DerFluisterer"]

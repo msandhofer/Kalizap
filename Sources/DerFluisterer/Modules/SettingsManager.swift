@@ -103,12 +103,13 @@ public struct CorrectionSettings: Codable, Equatable {
     public var allowRestructuring: Bool = false
     public var personalDictionary: [String] = []
     public var llmTimeoutMs: Int = 800
+    public var showAPIKeyNotification: Bool = true
     public static let defaultAppMapping: [String: ContextMode] = [
         "com.apple.mail": .formal,
         "com.tinyspeck.slackmacgap": .informal,
         "com.microsoft.Outlook": .formal
     ]
-    public init(contextMode: ContextMode = .neutral, appMapping: [String: ContextMode] = CorrectionSettings.defaultAppMapping, allowRephrasing: Bool = false, allowShortening: Bool = false, allowRestructuring: Bool = false, personalDictionary: [String] = [], llmTimeoutMs: Int = 800) {
+    public init(contextMode: ContextMode = .neutral, appMapping: [String: ContextMode] = CorrectionSettings.defaultAppMapping, allowRephrasing: Bool = false, allowShortening: Bool = false, allowRestructuring: Bool = false, personalDictionary: [String] = [], llmTimeoutMs: Int = 800, showAPIKeyNotification: Bool = true) {
         self.contextMode = contextMode
         self.appMapping = appMapping
         self.allowRephrasing = allowRephrasing
@@ -116,6 +117,7 @@ public struct CorrectionSettings: Codable, Equatable {
         self.allowRestructuring = allowRestructuring
         self.personalDictionary = personalDictionary
         self.llmTimeoutMs = llmTimeoutMs
+        self.showAPIKeyNotification = showAPIKeyNotification
     }
 }
 

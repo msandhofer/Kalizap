@@ -33,11 +33,12 @@ struct SoundPlayerTests {
     @Test("toggling sounds enabled at runtime")
     func toggleSounds() {
         let backend = MockSoundBackend()
-        let player = SoundPlayer(backend: backend, soundsEnabled: false)
+        let enabled = SendableBox(false)
+        let player = SoundPlayer(backend: backend, isEnabled: { enabled.value })
         player.playRecordingStarted()
         #expect(backend.playedSounds.isEmpty)
 
-        player.soundsEnabled = true
+        enabled.set(true)
         player.playRecordingStarted()
         #expect(backend.playedSounds == [.recordingStarted])
     }

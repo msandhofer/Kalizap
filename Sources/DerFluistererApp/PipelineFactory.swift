@@ -23,7 +23,7 @@ enum PipelineFactory {
         )
         let sound = SoundPlayer(
             backend: SystemSoundBackend(),
-            soundsEnabled: settings.audio.soundsEnabled
+            isEnabled: { [settings] in settings.audio.soundsEnabled }
         )
 
         let deps = PipelineDependencies(
