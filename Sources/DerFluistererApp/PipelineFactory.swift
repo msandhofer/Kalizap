@@ -13,7 +13,7 @@ enum PipelineFactory {
         let noiseSuppressor = await loadNoiseSuppressor(enabled: settings.audio.noiseSuppressionEnabled)
 
         let recorder = AudioRecorderImpl(noiseSuppressor: noiseSuppressor)
-        let transcriber = makeTranscriber(model: settings.audio.whisperModel.rawValue)
+        let transcriber = makeTranscriber(model: settings.audio.whisperModel.rawValue, engine: settings.audio.whisperEngine)
         let corrector = makeCorrector(settings: settings)
         let inserter = TextInserterImpl(
             clipboard: NSPasteboardClipboardManager(),
@@ -62,8 +62,14 @@ enum PipelineFactory {
         }.value
     }
 
-    private static func makeTranscriber(model: String) -> WhisperTranscriptionEngine {
-        WhisperTranscriptionEngine(backend: WhisperKitBackend(model: model))
+    private static func makeTranscriber(model: String, engine: WhisperEngine) -> WhisperTranscriptionEngine {
+        let backend: WhisperBackend = switch engine {
+        case .whisperKit:
+            WhisperKitBackend(model: model)
+        case .whisperCpp:
+            WhisperCppBackend(model: model)
+        }
+        return WhisperTranscriptionEngine(backend: backend)
     }
 
     private static func makeCorrector(settings: SettingsManager) -> TextCorrectorImpl {

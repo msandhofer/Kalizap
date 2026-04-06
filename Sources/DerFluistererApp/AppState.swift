@@ -71,7 +71,7 @@ final class AppState {
     // MARK: - Private
 
     private func startPipeline() async {
-        FileLog.log("startPipeline — model=\(settings.audio.whisperModel.rawValue)")
+        FileLog.log("startPipeline — model=\(settings.audio.whisperModel.rawValue) engine=\(settings.audio.whisperEngine.rawValue)")
         let p = await PipelineFactory.makePipeline(settings: settings, store: store)
 
         p.onCorrectionFallback = { [weak self] in
@@ -108,16 +108,19 @@ final class AppState {
     private func observeSettingsChanges() {
         lastObservedModel = settings.audio.whisperModel
         lastObservedNS = settings.audio.noiseSuppressionEnabled
+        lastObservedEngine = settings.audio.whisperEngine
         scheduleObservation()
     }
 
     private var lastObservedModel: WhisperModel = .largeV3Turbo
     private var lastObservedNS: Bool = true
+    private var lastObservedEngine: WhisperEngine = .whisperCpp
 
     private func scheduleObservation() {
         withObservationTracking {
             _ = settings.audio.whisperModel
             _ = settings.audio.noiseSuppressionEnabled
+            _ = settings.audio.whisperEngine
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -126,10 +129,12 @@ final class AppState {
 
                 let newModel = self.settings.audio.whisperModel
                 let newNS = self.settings.audio.noiseSuppressionEnabled
-                if newModel != self.lastObservedModel || newNS != self.lastObservedNS {
-                    FileLog.log("AppState — settings changed: model=\(newModel.rawValue) ns=\(newNS)")
+                let newEngine = self.settings.audio.whisperEngine
+                if newModel != self.lastObservedModel || newNS != self.lastObservedNS || newEngine != self.lastObservedEngine {
+                    FileLog.log("AppState — settings changed: model=\(newModel.rawValue) engine=\(newEngine.rawValue) ns=\(newNS)")
                     self.lastObservedModel = newModel
                     self.lastObservedNS = newNS
+                    self.lastObservedEngine = newEngine
                     await self.restartPipeline()
                 }
             }

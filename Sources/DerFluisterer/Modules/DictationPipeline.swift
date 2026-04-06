@@ -154,7 +154,7 @@ public final class DictationPipeline {
         FileLog.log("Task.isCancelled=\(Task.isCancelled)")
         state = .loadingModel(progress: 0)
 
-        let estimatedDuration = Duration.seconds(deps.settings.audio.whisperModel.estimatedLoadTimeSeconds)
+        let estimatedDuration = Duration.seconds(deps.settings.audio.whisperModel.estimatedLoadTimeSeconds(for: deps.settings.audio.whisperEngine))
         let simulated = SimulatedProgress(estimatedDuration: estimatedDuration)
 
         let progressTask = Task.detached { @Sendable in

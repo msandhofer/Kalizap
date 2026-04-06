@@ -120,6 +120,18 @@ struct AudioSettingsSection: View {
             }
         }
 
+        Section("Whisper Engine") {
+            Picker("Engine", selection: $settings.audio.whisperEngine) {
+                ForEach(WhisperEngine.allCases, id: \.self) { engine in
+                    Text(engine.displayName).tag(engine)
+                }
+            }
+            .pickerStyle(.segmented)
+            Text(engineDescription)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+
         Section("Whisper-Modell") {
             Picker("Modell", selection: $settings.audio.whisperModel) {
                 ForEach(WhisperModel.allCases, id: \.self) { model in
@@ -148,6 +160,15 @@ struct AudioSettingsSection: View {
 
         Section("Feedback") {
             Toggle("Sounds aktiviert", isOn: $settings.audio.soundsEnabled)
+        }
+    }
+
+    private var engineDescription: String {
+        switch settings.audio.whisperEngine {
+        case .whisperKit:
+            "Nutzt Apple Neural Engine. Erste Nutzung erfordert Kompilierung (30s-8min)."
+        case .whisperCpp:
+            "Nutzt CPU/Metal GPU. Kein Cold-Start, sofort einsatzbereit."
         }
     }
 }

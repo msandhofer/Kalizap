@@ -19,8 +19,13 @@ public final class WhisperKitBackend: WhisperBackend, @unchecked Sendable {
         FileLog.log("WhisperKitBackend.loadModel START — model=\(modelName)")
         FileLog.log("  Task.isCancelled=\(Task.isCancelled)")
         do {
+            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            let modelBase = appSupport.appendingPathComponent("DerFluisterer/Models")
+            try FileManager.default.createDirectory(at: modelBase, withIntermediateDirectories: true)
+
             let config = WhisperKitConfig(
                 model: modelName,
+                downloadBase: modelBase,
                 computeOptions: ModelComputeOptions(
                     audioEncoderCompute: .cpuAndNeuralEngine,
                     textDecoderCompute: .cpuAndNeuralEngine

@@ -28,9 +28,25 @@ let package = Package(
             ]
         ),
         .target(
+            name: "CWhisper",
+            path: "Sources/CWhisper",
+            exclude: ["lib"],
+            publicHeadersPath: "include",
+            linkerSettings: [
+                .unsafeFlags([
+                    "-L", "Sources/CWhisper/lib",
+                    "-lwhisper",
+                ]),
+                .linkedFramework("Accelerate"),
+                .linkedFramework("Metal"),
+                .linkedFramework("MetalKit"),
+            ]
+        ),
+        .target(
             name: "DerFluisterer",
             dependencies: [
                 "CDeepFilter",
+                "CWhisper",
                 "WhisperKit",
                 .product(name: "Sparkle", package: "Sparkle"),
             ]
@@ -82,6 +98,11 @@ let package = Package(
             name: "ToastTestCLI",
             dependencies: [],
             path: "Tools/ToastTestCLI"
+        ),
+        .executableTarget(
+            name: "WhisperCppTestCLI",
+            dependencies: ["DerFluisterer"],
+            path: "Tools/WhisperCppTestCLI"
         ),
         .testTarget(
             name: "DerFluistererTests",

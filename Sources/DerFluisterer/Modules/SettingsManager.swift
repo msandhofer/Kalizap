@@ -18,13 +18,36 @@ public enum WhisperModel: String, Codable, CaseIterable, Sendable {
     }
 
     /// Estimated time in seconds for first-time model download + load.
-    public var estimatedLoadTimeSeconds: Double {
+    public func estimatedLoadTimeSeconds(for engine: WhisperEngine) -> Double {
+        switch engine {
+        case .whisperKit:
+            switch self {
+            case .tiny: 60
+            case .base: 120
+            case .small: 240
+            case .largeV3: 600
+            case .largeV3Turbo: 480
+            }
+        case .whisperCpp:
+            switch self {
+            case .tiny: 2
+            case .base: 3
+            case .small: 5
+            case .largeV3: 15
+            case .largeV3Turbo: 10
+            }
+        }
+    }
+}
+
+public enum WhisperEngine: String, Codable, CaseIterable, Sendable {
+    case whisperKit = "whisperkit"
+    case whisperCpp = "whispercpp"
+
+    public var displayName: String {
         switch self {
-        case .tiny: 60
-        case .base: 120
-        case .small: 240
-        case .largeV3: 600
-        case .largeV3Turbo: 480
+        case .whisperKit: "WhisperKit (Neural Engine)"
+        case .whisperCpp: "whisper.cpp (CPU/Metal)"
         }
     }
 }
@@ -34,13 +57,26 @@ public struct AudioSettings: Codable, Equatable {
     public var language: SupportedLanguage = .de
     public var soundsEnabled: Bool = true
     public var whisperModel: WhisperModel = .largeV3Turbo
+    public var whisperEngine: WhisperEngine = .whisperCpp
     public var noiseSuppressionEnabled: Bool = true
-    public init(microphoneID: String? = nil, language: SupportedLanguage = .de, soundsEnabled: Bool = true, whisperModel: WhisperModel = .largeV3Turbo, noiseSuppressionEnabled: Bool = true) {
+
+    public init(microphoneID: String? = nil, language: SupportedLanguage = .de, soundsEnabled: Bool = true, whisperModel: WhisperModel = .largeV3Turbo, whisperEngine: WhisperEngine = .whisperCpp, noiseSuppressionEnabled: Bool = true) {
         self.microphoneID = microphoneID
         self.language = language
         self.soundsEnabled = soundsEnabled
         self.whisperModel = whisperModel
+        self.whisperEngine = whisperEngine
         self.noiseSuppressionEnabled = noiseSuppressionEnabled
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        microphoneID = try container.decodeIfPresent(String.self, forKey: .microphoneID)
+        language = try container.decodeIfPresent(SupportedLanguage.self, forKey: .language) ?? .de
+        soundsEnabled = try container.decodeIfPresent(Bool.self, forKey: .soundsEnabled) ?? true
+        whisperModel = try container.decodeIfPresent(WhisperModel.self, forKey: .whisperModel) ?? .largeV3Turbo
+        whisperEngine = try container.decodeIfPresent(WhisperEngine.self, forKey: .whisperEngine) ?? .whisperCpp
+        noiseSuppressionEnabled = try container.decodeIfPresent(Bool.self, forKey: .noiseSuppressionEnabled) ?? true
     }
 }
 
