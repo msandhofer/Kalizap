@@ -127,7 +127,39 @@ struct HistoryEntryRow: View {
                         .animation(.easeInOut(duration: 0.2), value: isCopied)
                 }
             }
+
+            if entry.transcriptionMs != nil {
+                timingRow
+            }
         }
         .padding(.vertical, 2)
+    }
+
+    @ViewBuilder
+    private var timingRow: some View {
+        let parts: [String] = [
+            entry.normalizationMs.map { "Norm: \($0)ms" },
+            entry.transcriptionMs.map { "STT: \($0)ms" },
+            entry.correctionMs.map { "LLM: \($0)ms" },
+            entry.insertionMs.map { "Ins: \($0)ms" },
+            entry.overheadMs.map { "OH: \($0)ms" },
+        ].compactMap { $0 }
+
+        let meta: [String] = [
+            entry.whisperModel,
+            entry.whisperEngine,
+            entry.audioSampleCount.map { "\(String(format: "%.1f", Double($0) / 16000.0))s Audio" },
+        ].compactMap { $0 }
+
+        VStack(alignment: .leading, spacing: 2) {
+            Text(parts.joined(separator: " | ") + " = \(entry.processingTimeMs)ms")
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(.secondary)
+            if !meta.isEmpty {
+                Text(meta.joined(separator: " · "))
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+            }
+        }
     }
 }

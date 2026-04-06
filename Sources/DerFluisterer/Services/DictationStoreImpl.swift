@@ -42,7 +42,15 @@ public actor DictationStoreImpl: DictationStoring {
             contextMode: entry.contextMode,
             targetApp: entry.targetApp,
             durationMs: entry.durationMs,
-            processingTimeMs: entry.processingTimeMs
+            processingTimeMs: entry.processingTimeMs,
+            normalizationMs: entry.normalizationMs,
+            transcriptionMs: entry.transcriptionMs,
+            correctionMs: entry.correctionMs,
+            insertionMs: entry.insertionMs,
+            usedStreamingResult: entry.usedStreamingResult,
+            audioSampleCount: entry.audioSampleCount,
+            whisperModel: entry.whisperModel,
+            whisperEngine: entry.whisperEngine
         )
         modelContext.insert(record)
         try modelContext.save()

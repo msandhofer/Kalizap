@@ -59,6 +59,49 @@ public final class GGMLModelManager: Sendable {
         return destination
     }
 
+    // MARK: - VAD Model
+
+    private static let vadFileName = "ggml-silero-v6.2.0.bin"
+    private static let vadDownloadURL = URL(string: "https://huggingface.co/ggml-org/whisper-vad/resolve/main/\(vadFileName)")!
+
+    public var vadModelURL: URL {
+        baseURL.appendingPathComponent("vad").appendingPathComponent(Self.vadFileName)
+    }
+
+    public func downloadVADModel(
+        onProgress: @Sendable @escaping (Double) -> Void
+    ) async throws -> URL {
+        let destination = vadModelURL
+
+        if FileManager.default.fileExists(atPath: destination.path) {
+            logger.info("VAD model already downloaded")
+            onProgress(0.9)
+            return destination
+        }
+
+        let vadDir = baseURL.appendingPathComponent("vad")
+        try FileManager.default.createDirectory(at: vadDir, withIntermediateDirectories: true)
+
+        logger.info("Downloading VAD model: \(Self.vadDownloadURL.absoluteString)")
+
+        let delegate = DownloadProgressDelegate(onProgress: onProgress)
+        let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+
+        let (tempURL, response) = try await session.download(from: Self.vadDownloadURL)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw GGMLModelError.downloadFailed(statusCode: statusCode)
+        }
+
+        try FileManager.default.moveItem(at: tempURL, to: destination)
+        logger.info("VAD model saved: \(destination.path)")
+        onProgress(0.9)
+
+        return destination
+    }
+
     public func deleteModel(_ model: WhisperModel) throws {
         let url = modelURL(for: model)
         if FileManager.default.fileExists(atPath: url.path) {

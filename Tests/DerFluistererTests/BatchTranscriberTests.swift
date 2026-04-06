@@ -27,6 +27,8 @@ final class MockWhisperBackend: WhisperBackend, @unchecked Sendable {
         lastPrompt = prompt
         return WhisperTranscriptionResult(text: resultText, segments: [])
     }
+
+    func detectSilenceBoundaries(samples: [Float]) -> [Float] { [] }
 }
 
 // MARK: - Tests

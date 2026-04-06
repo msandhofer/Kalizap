@@ -92,4 +92,8 @@ public final class WhisperKitBackend: WhisperBackend, @unchecked Sendable {
             throw TranscriptionError.batchFailed(reason: error.localizedDescription)
         }
     }
+
+    public func detectSilenceBoundaries(samples: [Float]) -> [Float] {
+        []
+    }
 }

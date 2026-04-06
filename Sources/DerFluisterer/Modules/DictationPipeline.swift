@@ -1,6 +1,13 @@
 import Foundation
 import os.log
 
+extension Duration {
+    var millisInt: Int {
+        let (seconds, attoseconds) = components
+        return Int(seconds * 1000) + Int(Double(attoseconds) / 1e15)
+    }
+}
+
 private let logger = Logger(subsystem: "com.derfluesterer", category: "Pipeline")
 
 /// File logger controlled by --verbose-log launch argument.
@@ -93,6 +100,9 @@ private struct DictationJob {
     let correctionConfig: CorrectionConfig
     let language: SupportedLanguage
     let streamingResult: String
+    let stopSoundMs: Int
+    let recorderStopMs: Int
+    let streamingWaitMs: Int
 }
 
 @Observable @MainActor
@@ -114,6 +124,7 @@ public final class DictationPipeline {
     public private(set) var lastError: PipelineError?
     public private(set) var stateHistory: [PipelineState] = []
     public private(set) var streamingText: String = ""
+    private var streamingFinalTranscription: FinalTranscription?
     public private(set) var audioLevel: Float = 0
 
     /// Called when correction falls back to raw text due to API error (e.g. missing/invalid key).
@@ -247,6 +258,7 @@ public final class DictationPipeline {
         cancelled = false
         isRecording = true
         streamingText = ""
+        streamingFinalTranscription = nil
         collectedChunks = []
         state = .recording
         startRecordingWatchdog()
@@ -275,18 +287,34 @@ public final class DictationPipeline {
         }
     }
 
+    private func stopLevelMetering() {
+        levelTask?.cancel()
+        levelTask = nil
+        audioLevel = 0
+    }
+
     private func handleStop() async {
         FileLog.log("handleStop — begin, isRecording=\(isRecording)")
         recordingWatchdog?.cancel()
         let stopTimestamp = ContinuousClock.now
         isRecording = false
 
-        stopStreamingAndMetering()
-        deps.transcriber.cancel()  // Stop orphaned streaming transcription before it calls backend
+        stopLevelMetering()
 
+        let tSound = ContinuousClock.now
         await deps.sound.playStopSound()
+        let stopSoundMs = (ContinuousClock.now - tSound).millisInt
+
+        let tRecorder = ContinuousClock.now
         await deps.recorder.stopRecording()
-        FileLog.log("handleStop — recorder stopped")
+        let recorderStopMs = (ContinuousClock.now - tRecorder).millisInt
+        FileLog.log("handleStop — recorder stopped in \(recorderStopMs)ms, waiting for streaming final decode")
+
+        let tStreaming = ContinuousClock.now
+        await streamingTask?.value
+        streamingTask = nil
+        let streamingWaitMs = (ContinuousClock.now - tStreaming).millisInt
+        FileLog.log("handleStop — streaming wait \(streamingWaitMs)ms, streamingText=\(streamingText.prefix(50))...")
 
         let buffer = collectBuffer()
         FileLog.log("handleStop — buffer: \(buffer.samples.count) samples, \(String(format: "%.1f", buffer.totalDuration))s, streamingText=\(streamingText.prefix(50))...")
@@ -301,7 +329,10 @@ public final class DictationPipeline {
             stopTimestamp: stopTimestamp,
             correctionConfig: buildCorrectionConfig(),
             language: deps.settings.audio.language,
-            streamingResult: streamingText
+            streamingResult: streamingText,
+            stopSoundMs: stopSoundMs,
+            recorderStopMs: recorderStopMs,
+            streamingWaitMs: streamingWaitMs
         )
         FileLog.log("handleStop — job created, queueing process")
 
@@ -340,7 +371,12 @@ public final class DictationPipeline {
             let results = self.deps.transcriber.transcribe(audioStream, config: config)
             for await result in results {
                 if Task.isCancelled { return }
-                await MainActor.run { self.streamingText = result.text }
+                await MainActor.run {
+                    self.streamingText = result.text
+                    if case .final(let ft) = result {
+                        self.streamingFinalTranscription = ft
+                    }
+                }
             }
         }
     }
@@ -376,6 +412,15 @@ public final class DictationPipeline {
         }
     }
 
+    private struct StageTimings {
+        var normalizationMs: Int = 0
+        var transcriptionMs: Int = 0
+        var correctionMs: Int = 0
+        var insertionMs: Int = 0
+        var usedStreamingResult: Bool = false
+        var audioSampleCount: Int = 0
+    }
+
     private func process(_ job: DictationJob) async {
         FileLog.log("process — begin, cancelled=\(cancelled)")
         guard !cancelled else {
@@ -383,11 +428,26 @@ public final class DictationPipeline {
             return
         }
 
+        var timings = StageTimings()
+        timings.audioSampleCount = job.buffer.samples.count
+        timings.usedStreamingResult = !job.streamingResult.isEmpty
+
         // 1. Transcribe
+        let t1 = ContinuousClock.now
         guard let transcription = await performTranscription(job) else { return }
+        let transcriptionElapsed = ContinuousClock.now - t1
+
+        if case .final(let ft) = transcription {
+            timings.normalizationMs = ft.normalizationTime.millisInt
+            timings.transcriptionMs = ft.processingTime.millisInt
+        } else {
+            timings.transcriptionMs = transcriptionElapsed.millisInt
+        }
 
         // 2. Correct
+        let t2 = ContinuousClock.now
         let correctionOutcome = await applyCorrection(job, transcription: transcription)
+        timings.correctionMs = (ContinuousClock.now - t2).millisInt
         guard !cancelled else { return }
 
         let correctedText = correctionOutcome.text
@@ -403,11 +463,17 @@ public final class DictationPipeline {
         }
 
         // 4. Insert
+        let t3 = ContinuousClock.now
         let insertionResult = await insertText(correctedText)
+        timings.insertionMs = (ContinuousClock.now - t3).millisInt
         guard !cancelled else { return }
 
         // 5. Persist + finalize
-        await persistResult(job, rawText: transcription.text, correctedText: correctedText, insertionResult: insertionResult)
+        let t4 = ContinuousClock.now
+        await persistResult(job, rawText: transcription.text, correctedText: correctedText, insertionResult: insertionResult, timings: timings)
+        let persistMs = (ContinuousClock.now - t4).millisInt
+
+        FileLog.log("process — overhead breakdown: stopSound=\(job.stopSoundMs)ms recorder=\(job.recorderStopMs)ms streamingWait=\(job.streamingWaitMs)ms persist=\(persistMs)ms")
     }
 
     private func performTranscription(_ job: DictationJob) async -> TranscriptionResult? {
@@ -418,7 +484,9 @@ public final class DictationPipeline {
         updateStateIfNotRecording(.processing(stage: .transcribing))
 
         let transcription: TranscriptionResult?
-        if useStreaming {
+        if useStreaming, let ft = streamingFinalTranscription {
+            transcription = .final(ft)
+        } else if useStreaming {
             transcription = .final(FinalTranscription(
                 text: job.streamingResult,
                 segments: [],
@@ -455,7 +523,7 @@ public final class DictationPipeline {
         return result
     }
 
-    private func persistResult(_ job: DictationJob, rawText: String, correctedText: String, insertionResult: InsertionResult) async {
+    private func persistResult(_ job: DictationJob, rawText: String, correctedText: String, insertionResult: InsertionResult, timings: StageTimings) async {
         let measuredLatencyMs = job.stopTimestamp.millisecondsSinceNow()
         latencyMs = measuredLatencyMs
 
@@ -468,7 +536,15 @@ public final class DictationPipeline {
             contextMode: job.correctionConfig.contextMode.rawValue,
             targetApp: deps.appDetector.frontmostApp()?.localizedName,
             durationMs: Int(job.buffer.totalDuration * 1000),
-            processingTimeMs: measuredLatencyMs
+            processingTimeMs: measuredLatencyMs,
+            normalizationMs: timings.normalizationMs,
+            transcriptionMs: timings.transcriptionMs,
+            correctionMs: timings.correctionMs,
+            insertionMs: timings.insertionMs,
+            usedStreamingResult: timings.usedStreamingResult,
+            audioSampleCount: timings.audioSampleCount,
+            whisperModel: deps.settings.audio.whisperModel.rawValue,
+            whisperEngine: deps.settings.audio.whisperEngine.rawValue
         )
         try? await deps.store.save(entry)
 

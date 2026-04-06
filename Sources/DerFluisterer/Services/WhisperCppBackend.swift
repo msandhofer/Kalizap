@@ -6,6 +6,7 @@ private let logger = Logger(subsystem: "com.derfluesterer", category: "WhisperCp
 
 public final class WhisperCppBackend: WhisperBackend, @unchecked Sendable {
     private var ctx: OpaquePointer? // whisper_context*
+    private var vadCtx: OpaquePointer? // whisper_vad_context*
     private let modelName: String
     private var languagePointer: UnsafeMutablePointer<CChar>?
     private var promptPointer: UnsafeMutablePointer<CChar>?
@@ -16,6 +17,7 @@ public final class WhisperCppBackend: WhisperBackend, @unchecked Sendable {
 
     deinit {
         if let ctx { whisper_free(ctx) }
+        if let vadCtx { whisper_vad_free(vadCtx) }
         freeStringPointers()
     }
 
@@ -29,16 +31,28 @@ public final class WhisperCppBackend: WhisperBackend, @unchecked Sendable {
 
         FileLog.log("WhisperCppBackend.loadModel START — model=\(modelName)")
         do {
-            let modelURL = try await withoutActuallyEscaping(onProgress) { escapingProgress in
+            // Download Whisper model + VAD model in parallel
+            async let whisperDownload = withoutActuallyEscaping(onProgress) { escapingProgress in
                 try await GGMLModelManager.shared.downloadModel(model, onProgress: escapingProgress)
             }
-            FileLog.log("  GGML model ready at \(modelURL.path)")
+            async let vadDownload = GGMLModelManager.shared.downloadVADModel { _ in }
 
-            ctx = whisper_init_from_file(modelURL.path)
+            let modelURL = try await whisperDownload
+            let vadURL = try await vadDownload
+            FileLog.log("  GGML model ready at \(modelURL.path)")
+            FileLog.log("  VAD model ready at \(vadURL.path)")
+
+            var ctxParams = whisper_context_default_params()
+            ctxParams.use_gpu = true
+            ctxParams.flash_attn = true
+            ctx = whisper_init_from_file_with_params(modelURL.path, ctxParams)
             guard ctx != nil else {
-                throw TranscriptionError.modelLoadFailed(reason: "whisper_init_from_file returned nil")
+                throw TranscriptionError.modelLoadFailed(reason: "whisper_init_from_file_with_params returned nil")
             }
-            FileLog.log("  Whisper context created")
+
+            var vadCtxParams = whisper_vad_default_context_params()
+            vadCtx = whisper_vad_init_from_file_with_params(vadURL.path, vadCtxParams)
+            FileLog.log("  Whisper + VAD contexts created (VAD=\(vadCtx != nil))")
             onProgress(1.0)
         } catch {
             FileLog.log("  WhisperCpp loadModel FAILED: \(error)")
@@ -56,10 +70,18 @@ public final class WhisperCppBackend: WhisperBackend, @unchecked Sendable {
         }
 
         var params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY)
-        params.n_threads = Int32(max(1, ProcessInfo.processInfo.activeProcessorCount - 2))
+        params.n_threads = Int32(max(1, ProcessInfo.processInfo.activeProcessorCount / 2))
         params.print_progress = false
         params.print_timestamps = false
         params.print_special = false
+        params.no_timestamps = true
+        params.single_segment = true
+        params.suppress_blank = true
+        params.temperature_inc = 0
+
+        let melFrames = Int(ceil(Double(samples.count) / 16000.0 * 100.0))
+        let aligned = ((melFrames + 63) / 64) * 64
+        params.audio_ctx = Int32(max(768, min(aligned, 1500)))
 
         freeStringPointers()
         languagePointer = strdup(language)
@@ -107,6 +129,30 @@ public final class WhisperCppBackend: WhisperBackend, @unchecked Sendable {
         }.value
 
         return result
+    }
+
+    public func detectSilenceBoundaries(samples: [Float]) -> [Float] {
+        guard let vadCtx else { return [] }
+
+        var vadParams = whisper_vad_default_params()
+        vadParams.min_silence_duration_ms = 300
+        vadParams.speech_pad_ms = 50
+
+        guard let segments = samples.withUnsafeBufferPointer({ buf in
+            whisper_vad_segments_from_samples(vadCtx, vadParams, buf.baseAddress, Int32(buf.count))
+        }) else { return [] }
+        defer { whisper_vad_free_segments(segments) }
+
+        let n = whisper_vad_segments_n_segments(segments)
+        guard n > 0 else { return [] }
+
+        // Return end-times of speech segments (= start of silence)
+        var boundaries: [Float] = []
+        for i in 0..<n {
+            let t1 = whisper_vad_segments_get_segment_t1(segments, i)
+            boundaries.append(t1)
+        }
+        return boundaries
     }
 
     private func freeStringPointers() {

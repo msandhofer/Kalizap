@@ -24,11 +24,13 @@ public struct FinalTranscription: Sendable, Equatable {
     public let text: String
     public let segments: [TranscriptionSegment]
     public let processingTime: Duration
+    public let normalizationTime: Duration
 
-    public init(text: String, segments: [TranscriptionSegment], processingTime: Duration) {
+    public init(text: String, segments: [TranscriptionSegment], processingTime: Duration, normalizationTime: Duration = .zero) {
         self.text = text
         self.segments = segments
         self.processingTime = processingTime
+        self.normalizationTime = normalizationTime
     }
 }
 

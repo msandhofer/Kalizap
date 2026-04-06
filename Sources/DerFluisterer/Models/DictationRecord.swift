@@ -12,6 +12,16 @@ public struct DictationEntry: Sendable, Equatable, Identifiable {
     public let durationMs: Int
     public let processingTimeMs: Int
 
+    // Per-stage timing (optional for backward compatibility with old records)
+    public let normalizationMs: Int?
+    public let transcriptionMs: Int?
+    public let correctionMs: Int?
+    public let insertionMs: Int?
+    public let usedStreamingResult: Bool?
+    public let audioSampleCount: Int?
+    public let whisperModel: String?
+    public let whisperEngine: String?
+
     public var wordCount: Int {
         correctedText.split(separator: " ").count
     }
@@ -19,6 +29,12 @@ public struct DictationEntry: Sendable, Equatable, Identifiable {
     public var wordsPerMinute: Double {
         guard durationMs > 0 else { return 0 }
         return Double(wordCount) / (Double(durationMs) / 60_000)
+    }
+
+    public var overheadMs: Int? {
+        guard let norm = normalizationMs, let trans = transcriptionMs,
+              let corr = correctionMs, let ins = insertionMs else { return nil }
+        return max(0, processingTimeMs - (norm + trans + corr + ins))
     }
 
     public init(
@@ -30,7 +46,15 @@ public struct DictationEntry: Sendable, Equatable, Identifiable {
         contextMode: String,
         targetApp: String?,
         durationMs: Int,
-        processingTimeMs: Int
+        processingTimeMs: Int,
+        normalizationMs: Int? = nil,
+        transcriptionMs: Int? = nil,
+        correctionMs: Int? = nil,
+        insertionMs: Int? = nil,
+        usedStreamingResult: Bool? = nil,
+        audioSampleCount: Int? = nil,
+        whisperModel: String? = nil,
+        whisperEngine: String? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -41,6 +65,14 @@ public struct DictationEntry: Sendable, Equatable, Identifiable {
         self.targetApp = targetApp
         self.durationMs = durationMs
         self.processingTimeMs = processingTimeMs
+        self.normalizationMs = normalizationMs
+        self.transcriptionMs = transcriptionMs
+        self.correctionMs = correctionMs
+        self.insertionMs = insertionMs
+        self.usedStreamingResult = usedStreamingResult
+        self.audioSampleCount = audioSampleCount
+        self.whisperModel = whisperModel
+        self.whisperEngine = whisperEngine
     }
 }
 
@@ -55,6 +87,14 @@ public final class DictationRecord {
     var targetApp: String?
     var durationMs: Int
     var processingTimeMs: Int
+    var normalizationMs: Int?
+    var transcriptionMs: Int?
+    var correctionMs: Int?
+    var insertionMs: Int?
+    var usedStreamingResult: Bool?
+    var audioSampleCount: Int?
+    var whisperModel: String?
+    var whisperEngine: String?
 
     init(
         id: UUID = UUID(),
@@ -65,7 +105,15 @@ public final class DictationRecord {
         contextMode: String,
         targetApp: String?,
         durationMs: Int,
-        processingTimeMs: Int
+        processingTimeMs: Int,
+        normalizationMs: Int? = nil,
+        transcriptionMs: Int? = nil,
+        correctionMs: Int? = nil,
+        insertionMs: Int? = nil,
+        usedStreamingResult: Bool? = nil,
+        audioSampleCount: Int? = nil,
+        whisperModel: String? = nil,
+        whisperEngine: String? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -76,6 +124,14 @@ public final class DictationRecord {
         self.targetApp = targetApp
         self.durationMs = durationMs
         self.processingTimeMs = processingTimeMs
+        self.normalizationMs = normalizationMs
+        self.transcriptionMs = transcriptionMs
+        self.correctionMs = correctionMs
+        self.insertionMs = insertionMs
+        self.usedStreamingResult = usedStreamingResult
+        self.audioSampleCount = audioSampleCount
+        self.whisperModel = whisperModel
+        self.whisperEngine = whisperEngine
     }
 
     var asEntry: DictationEntry {
@@ -88,7 +144,15 @@ public final class DictationRecord {
             contextMode: contextMode,
             targetApp: targetApp,
             durationMs: durationMs,
-            processingTimeMs: processingTimeMs
+            processingTimeMs: processingTimeMs,
+            normalizationMs: normalizationMs,
+            transcriptionMs: transcriptionMs,
+            correctionMs: correctionMs,
+            insertionMs: insertionMs,
+            usedStreamingResult: usedStreamingResult,
+            audioSampleCount: audioSampleCount,
+            whisperModel: whisperModel,
+            whisperEngine: whisperEngine
         )
     }
 }

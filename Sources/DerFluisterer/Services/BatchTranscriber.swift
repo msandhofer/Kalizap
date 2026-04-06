@@ -21,6 +21,10 @@ public protocol WhisperBackend: Sendable {
         language: String,
         prompt: String
     ) async throws -> WhisperTranscriptionResult
+
+    /// Returns timestamps (in seconds) of silence boundaries detected by VAD.
+    /// Empty array if VAD is not available.
+    func detectSilenceBoundaries(samples: [Float]) -> [Float]
 }
 
 public final class BatchTranscriber: @unchecked Sendable {
