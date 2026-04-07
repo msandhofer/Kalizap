@@ -24,6 +24,13 @@ final class SampleBuffer: @unchecked Sendable {
         return storage.count
     }
 
+    func samples(from offset: Int) -> [Float] {
+        lock.lock()
+        defer { lock.unlock() }
+        guard offset < storage.count else { return [] }
+        return Array(storage[offset...])
+    }
+
     func reset() {
         lock.lock()
         storage.removeAll()

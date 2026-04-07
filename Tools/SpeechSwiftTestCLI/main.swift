@@ -222,6 +222,11 @@ func runLiveMode(language: String) async throws {
         let vadAnalysisTime = ContinuousClock.now - vadStart
         let speechDuration = segments.reduce(0.0) { $0 + $1.duration }
 
+        if segments.isEmpty {
+            print("  [VAD] Keine Sprache erkannt, überspringe Transkription.")
+            continue
+        }
+
         // Transcribe
         let transcribeStart = ContinuousClock.now
         let text = asrModel.transcribe(
@@ -286,7 +291,7 @@ func runBatchMode(directory: String, language: String) async throws {
 
     // 2. Load models (einmalig)
     let (asrModel, modelLoadTime) = try await loadASRModel()
-    let (_, vadLoadTime) = try await loadVADModel()
+    let (vadModel, vadLoadTime) = try await loadVADModel()
     print("")
 
     // 3. Transcribe each file
@@ -298,20 +303,33 @@ func runBatchMode(directory: String, language: String) async throws {
 
         let (samples, audioDuration) = try AudioLoader.loadSamples(from: fileURL.path)
 
-        let transcribeStart = ContinuousClock.now
-        let text = asrModel.transcribe(
-            audio: samples,
-            sampleRate: 16000,
-            language: language
-        )
-        let transcribeTime = ContinuousClock.now - transcribeStart
+        // VAD-Gate: skip transcription if no speech detected
+        let vadSegments = vadModel.detectSpeech(audio: samples, sampleRate: 16000)
+        let text: String
+        let transcribeTime: Duration
+
+        if vadSegments.isEmpty {
+            text = ""
+            transcribeTime = .zero
+            print("  [VAD] Keine Sprache erkannt, überspringe Transkription.")
+        } else {
+            let transcribeStart = ContinuousClock.now
+            text = asrModel.transcribe(
+                audio: samples,
+                sampleRate: 16000,
+                language: language
+            )
+            transcribeTime = ContinuousClock.now - transcribeStart
+        }
         let transcribeMs = transcribeTime.components.seconds * 1000
             + transcribeTime.components.attoseconds / 1_000_000_000_000_000
         let rtf = Double(transcribeMs) / (audioDuration * 1000)
 
         // Check for expected text
         let baseName = fileURL.deletingPathExtension().path
-        let expectedPath = baseName + ".expected.txt"
+        let expectedTxt = baseName + ".txt"
+        let expectedLong = baseName + ".expected.txt"
+        let expectedPath = fm.fileExists(atPath: expectedTxt) ? expectedTxt : expectedLong
         let expected: String? = fm.fileExists(atPath: expectedPath)
             ? try? String(contentsOfFile: expectedPath, encoding: .utf8)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
