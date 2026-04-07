@@ -249,6 +249,133 @@ func runLiveMode(language: String) async throws {
     }
 }
 
+// MARK: - Batch Mode
+
+struct BatchResult {
+    let file: String
+    let audioDuration: Double
+    let transcribeMs: Int64
+    let rtf: Double
+    let text: String
+    let expected: String?
+}
+
+func runBatchMode(directory: String, language: String) async throws {
+    print("=== SpeechSwiftTestCLI — Batch Mode ===")
+    print("Verzeichnis: \(directory)")
+    print("Sprache:     \(language)")
+    print("")
+
+    // 1. Find audio files
+    let fm = FileManager.default
+    let dirURL = URL(fileURLWithPath: directory)
+    let contents = try fm.contentsOfDirectory(
+        at: dirURL,
+        includingPropertiesForKeys: nil
+    )
+    let audioExtensions: Set<String> = ["m4a", "wav", "mp3", "caf", "aiff", "flac"]
+    let audioFiles = contents
+        .filter { audioExtensions.contains($0.pathExtension.lowercased()) }
+        .sorted { $0.lastPathComponent < $1.lastPathComponent }
+
+    guard !audioFiles.isEmpty else {
+        print("Keine Audio-Dateien gefunden in \(directory)")
+        exit(1)
+    }
+    print("Gefunden: \(audioFiles.count) Audio-Datei(en)")
+
+    // 2. Load models (einmalig)
+    let (asrModel, modelLoadTime) = try await loadASRModel()
+    let (_, vadLoadTime) = try await loadVADModel()
+    print("")
+
+    // 3. Transcribe each file
+    var results: [BatchResult] = []
+
+    for (index, fileURL) in audioFiles.enumerated() {
+        let fileName = fileURL.lastPathComponent
+        print("[\(index + 1)/\(audioFiles.count)] \(fileName)")
+
+        let (samples, audioDuration) = try AudioLoader.loadSamples(from: fileURL.path)
+
+        let transcribeStart = ContinuousClock.now
+        let text = asrModel.transcribe(
+            audio: samples,
+            sampleRate: 16000,
+            language: language
+        )
+        let transcribeTime = ContinuousClock.now - transcribeStart
+        let transcribeMs = transcribeTime.components.seconds * 1000
+            + transcribeTime.components.attoseconds / 1_000_000_000_000_000
+        let rtf = Double(transcribeMs) / (audioDuration * 1000)
+
+        // Check for expected text
+        let baseName = fileURL.deletingPathExtension().path
+        let expectedPath = baseName + ".expected.txt"
+        let expected: String? = fm.fileExists(atPath: expectedPath)
+            ? try? String(contentsOfFile: expectedPath, encoding: .utf8)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            : nil
+
+        results.append(BatchResult(
+            file: fileName,
+            audioDuration: audioDuration,
+            transcribeMs: transcribeMs,
+            rtf: rtf,
+            text: text,
+            expected: expected
+        ))
+
+        print("  Text:  \(text)")
+        if let expected {
+            let match = text.trimmingCharacters(in: .whitespacesAndNewlines) == expected
+            print("  Soll:  \(expected)")
+            print("  Match: \(match ? "JA" : "NEIN")")
+        }
+        print("  Zeit:  \(transcribeMs)ms (RTF \(String(format: "%.3f", rtf)))")
+        print("")
+    }
+
+    // 4. Summary table
+    print("=== Zusammenfassung ===")
+    print("")
+    let maxName = results.map(\.file.count).max() ?? 10
+    let header = "Datei".padding(toLength: maxName + 2, withPad: " ", startingAt: 0)
+    print("  \(header)Dauer     STT       RTF       Match")
+    print("  \(String(repeating: "─", count: maxName + 42))")
+
+    for r in results {
+        let name = r.file.padding(toLength: maxName + 2, withPad: " ", startingAt: 0)
+        let dur = "\(String(format: "%.1f", r.audioDuration))s".padding(toLength: 10, withPad: " ", startingAt: 0)
+        let stt = "\(r.transcribeMs)ms".padding(toLength: 10, withPad: " ", startingAt: 0)
+        let rtf = String(format: "%.3f", r.rtf).padding(toLength: 10, withPad: " ", startingAt: 0)
+        let match: String
+        if let expected = r.expected {
+            match = r.text.trimmingCharacters(in: .whitespacesAndNewlines) == expected ? "JA" : "NEIN"
+        } else {
+            match = "—"
+        }
+        print("  \(name)\(dur)\(stt)\(rtf)\(match)")
+    }
+
+    let avgMs = results.map(\.transcribeMs).reduce(0, +) / Int64(results.count)
+    let avgRtf = results.map(\.rtf).reduce(0, +) / Double(results.count)
+    print("")
+    print("  Durchschnitt: \(avgMs)ms STT, RTF \(String(format: "%.3f", avgRtf))")
+    print("  Modell laden: \(formatMs(modelLoadTime)), VAD laden: \(formatMs(vadLoadTime))")
+
+    let matchCount = results.filter { r in
+        guard let expected = r.expected else { return false }
+        return r.text.trimmingCharacters(in: .whitespacesAndNewlines) == expected
+    }.count
+    let totalWithExpected = results.filter { $0.expected != nil }.count
+    if totalWithExpected > 0 {
+        print("  Matches: \(matchCount)/\(totalWithExpected)")
+    }
+
+    print("\nPASS")
+}
+
 // MARK: - Main
 
 Task {
@@ -269,8 +396,14 @@ Task {
             try await runLiveMode(language: language)
 
         case "batch":
-            print("Batch-Modus noch nicht implementiert.")
-            exit(1)
+            let dir = CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : ""
+            guard !dir.isEmpty else {
+                print("Fehler: Verzeichnis-Pfad erforderlich.")
+                print(usage)
+                exit(1)
+            }
+            let language = CommandLine.arguments.count > 3 ? CommandLine.arguments[3] : "de"
+            try await runBatchMode(directory: dir, language: language)
 
         default:
             print("Unbekannter Modus: \(mode)")
