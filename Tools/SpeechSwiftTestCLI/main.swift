@@ -9,6 +9,7 @@ let usage = """
 Usage:
   swift run SpeechSwiftTestCLI file <audio-path> [de|en]
   swift run SpeechSwiftTestCLI live [de|en]
+  swift run SpeechSwiftTestCLI stream [de|en]
   swift run SpeechSwiftTestCLI batch <directory> [de|en]
 """
 
@@ -254,6 +255,235 @@ func runLiveMode(language: String) async throws {
     }
 }
 
+// MARK: - Stream Mode
+
+/// Mutable state shared between the VAD background task and the main recording loop.
+/// Declared @unchecked Sendable because access is serialised by design:
+/// the Task reads/writes during recording, the outer function reads after cancellation.
+final class StreamState: @unchecked Sendable {
+    var vadCursor: Int = 0
+    var segmentTexts: [(text: String, sttDuration: Duration, startTime: Float, endTime: Float)] = []
+}
+
+func runStreamMode(language: String) async throws {
+    print("=== SpeechSwiftTestCLI — Stream Mode ===")
+    print("Sprache: \(language)")
+    print("Real-time VAD + Segment-Transkription")
+    print("")
+
+    // 1. Load models
+    let (asrModel, _) = try await loadASRModel()
+    let (vadModel, _) = try await loadVADModel()
+    let processor = StreamingVADProcessor(model: vadModel)
+
+    print("\nBereit. Modelle geladen.")
+    print("───────────────────────────────────")
+
+    // 2. Recording loop
+    var runNumber = 0
+    while true {
+        runNumber += 1
+        print("\n[\(runNumber)] Drücke Enter zum Starten (oder 'q' + Enter zum Beenden)...")
+
+        guard let input = readLine(), input != "q" else {
+            print("Beende.")
+            break
+        }
+
+        // Setup mic capture (same as live mode)
+        let engine = AVAudioEngine()
+        let inputNode = engine.inputNode
+        let nativeFormat = inputNode.outputFormat(forBus: 0)
+        let sampleBuffer = SampleBuffer()
+
+        let targetFormat = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: 16000,
+            channels: 1,
+            interleaved: false
+        )!
+
+        guard let converter = AVAudioConverter(from: nativeFormat, to: targetFormat) else {
+            print("FEHLER: Audio-Converter konnte nicht erstellt werden")
+            continue
+        }
+
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: nativeFormat) { buffer, _ in
+            let frameCapacity = AVAudioFrameCount(
+                Double(buffer.frameLength) * 16000.0 / nativeFormat.sampleRate
+            )
+            guard let convertedBuffer = AVAudioPCMBuffer(
+                pcmFormat: targetFormat,
+                frameCapacity: frameCapacity + 100
+            ) else { return }
+
+            var error: NSError?
+            let inputBlock: AVAudioConverterInputBlock = { _, outStatus in
+                outStatus.pointee = .haveData
+                return buffer
+            }
+            converter.convert(to: convertedBuffer, error: &error, withInputFrom: inputBlock)
+
+            if error == nil, let channelData = convertedBuffer.floatChannelData {
+                let newSamples = Array(
+                    UnsafeBufferPointer(
+                        start: channelData[0],
+                        count: Int(convertedBuffer.frameLength)
+                    )
+                )
+                sampleBuffer.append(newSamples)
+            }
+        }
+
+        // Start recording
+        engine.prepare()
+        try engine.start()
+        print("  Aufnahme läuft... Drücke Enter zum Stoppen.")
+        print("")
+
+        // Streaming state (in a Sendable container so the Task can capture it)
+        processor.reset()
+        let state = StreamState()
+
+        // Background VAD + transcription task
+        // Use nonisolated(unsafe) to pass non-Sendable models to the task
+        nonisolated(unsafe) let asrRef = asrModel
+        nonisolated(unsafe) let processorRef = processor
+
+        let vadTask = Task {
+            while !Task.isCancelled {
+                let newSamples = sampleBuffer.samples(from: state.vadCursor)
+                if !newSamples.isEmpty {
+                    state.vadCursor += newSamples.count
+
+                    let events = processorRef.process(samples: newSamples)
+
+                    for event in events {
+                        switch event {
+                        case .speechStarted(let time):
+                            print("  [VAD \(String(format: "%.1f", time))s] Sprache erkannt")
+                        case .speechEnded(let segment):
+                            // Extract segment audio from full buffer
+                            let allSamples = sampleBuffer.samples
+                            let startIdx = max(0, Int(segment.startTime * 16000))
+                            let endIdx = min(Int(segment.endTime * 16000), allSamples.count)
+                            guard startIdx < endIdx else { continue }
+                            let segmentAudio = Array(allSamples[startIdx..<endIdx])
+
+                            // Transcribe this segment immediately
+                            let sttStart = ContinuousClock.now
+                            let text = asrRef.transcribe(
+                                audio: segmentAudio,
+                                sampleRate: 16000,
+                                language: language
+                            )
+                            let sttTime = ContinuousClock.now - sttStart
+
+                            state.segmentTexts.append((
+                                text: text,
+                                sttDuration: sttTime,
+                                startTime: segment.startTime,
+                                endTime: segment.endTime
+                            ))
+
+                            print("  [Segment \(state.segmentTexts.count)] \"\(text)\" (\(String(format: "%.1f", segment.startTime))-\(String(format: "%.1f", segment.endTime))s, STT: \(formatMs(sttTime)))")
+                        }
+                    }
+                }
+
+                do {
+                    try await Task.sleep(for: .milliseconds(100))
+                } catch {
+                    break // Cancelled
+                }
+            }
+        }
+
+        // Wait for Enter to stop
+        _ = readLine()
+        let stopTime = ContinuousClock.now
+
+        // Stop recording
+        engine.stop()
+        inputNode.removeTap(onBus: 0)
+        vadTask.cancel()
+
+        // Small delay to let the task clean up
+        try await Task.sleep(for: .milliseconds(50))
+
+        // Process remaining audio through VAD
+        let remainingSamples = sampleBuffer.samples(from: state.vadCursor)
+        if !remainingSamples.isEmpty {
+            let events = processor.process(samples: remainingSamples)
+            for event in events {
+                if case .speechEnded(let segment) = event {
+                    let allSamples = sampleBuffer.samples
+                    let startIdx = max(0, Int(segment.startTime * 16000))
+                    let endIdx = min(Int(segment.endTime * 16000), allSamples.count)
+                    guard startIdx < endIdx else { continue }
+                    let segmentAudio = Array(allSamples[startIdx..<endIdx])
+
+                    let sttStart = ContinuousClock.now
+                    let text = asrModel.transcribe(audio: segmentAudio, sampleRate: 16000, language: language)
+                    let sttTime = ContinuousClock.now - sttStart
+
+                    state.segmentTexts.append((text: text, sttDuration: sttTime, startTime: segment.startTime, endTime: segment.endTime))
+                    print("  [Segment \(state.segmentTexts.count)] \"\(text)\" (\(String(format: "%.1f", segment.startTime))-\(String(format: "%.1f", segment.endTime))s, STT: \(formatMs(sttTime)))")
+                }
+            }
+        }
+
+        // Flush VAD to catch any remaining speech
+        let flushEvents = processor.flush()
+        for event in flushEvents {
+            if case .speechEnded(let segment) = event {
+                let allSamples = sampleBuffer.samples
+                let startIdx = max(0, Int(segment.startTime * 16000))
+                let endIdx = min(Int(segment.endTime * 16000), allSamples.count)
+                guard startIdx < endIdx else { continue }
+                let segmentAudio = Array(allSamples[startIdx..<endIdx])
+
+                let sttStart = ContinuousClock.now
+                let text = asrModel.transcribe(audio: segmentAudio, sampleRate: 16000, language: language)
+                let sttTime = ContinuousClock.now - sttStart
+
+                state.segmentTexts.append((text: text, sttDuration: sttTime, startTime: segment.startTime, endTime: segment.endTime))
+                print("  [Segment \(state.segmentTexts.count)] \"\(text)\" (flush, \(String(format: "%.1f", segment.startTime))-\(String(format: "%.1f", segment.endTime))s, STT: \(formatMs(sttTime)))")
+            }
+        }
+
+        let afterStreamTime = ContinuousClock.now
+
+        // Total audio
+        let allSamples = sampleBuffer.samples
+        let audioDuration = Double(allSamples.count) / 16000.0
+
+        guard !state.segmentTexts.isEmpty else {
+            print("\n  [VAD] Keine Sprache erkannt.")
+            continue
+        }
+
+        // Streaming results
+        let streamText = state.segmentTexts.map(\.text).joined(separator: " ")
+        let lastSegmentSTT = state.segmentTexts.last!.sttDuration
+        let totalSTT = state.segmentTexts.reduce(Duration.zero) { $0 + $1.sttDuration }
+        let preTranscribed = state.segmentTexts.count - 1 // segments transcribed during recording
+        let latencyAfterStop = afterStreamTime - stopTime
+
+        // Timing table
+        printTimingTable([
+            ("Aufnahme-Dauer", "\(String(format: "%.1f", audioDuration))s"),
+            ("Segmente", "\(state.segmentTexts.count)"),
+            ("Voraus-transkribiert", "\(max(0, preTranscribed)) (während Aufnahme)"),
+            ("Letztes Segment STT", formatMs(lastSegmentSTT)),
+            ("Latenz nach Stop", formatMs(latencyAfterStop)),
+            ("Gesamt-STT", "\(formatMs(totalSTT)) (alle Segmente)"),
+        ])
+
+        print("  Stream-Text: \(streamText)")
+    }
+}
+
 // MARK: - Batch Mode
 
 struct BatchResult {
@@ -412,6 +642,10 @@ Task {
         case "live":
             let language = CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : "de"
             try await runLiveMode(language: language)
+
+        case "stream":
+            let language = CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : "de"
+            try await runStreamMode(language: language)
 
         case "batch":
             let dir = CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : ""
