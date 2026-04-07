@@ -7,10 +7,10 @@ import SpeechVAD
 
 let usage = """
 Usage:
-  swift run SpeechSwiftTestCLI file <audio-path> [de|en]
-  swift run SpeechSwiftTestCLI live [de|en]
-  swift run SpeechSwiftTestCLI stream [de|en]
-  swift run SpeechSwiftTestCLI batch <directory> [de|en]
+  swift run SpeechSwiftTestCLI file <audio-path> [de|en|auto]
+  swift run SpeechSwiftTestCLI live [de|en|auto]
+  swift run SpeechSwiftTestCLI stream [de|en|auto]
+  swift run SpeechSwiftTestCLI batch <directory> [de|en|auto]
 """
 
 let mode = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : ""
@@ -21,6 +21,11 @@ guard !mode.isEmpty else {
 }
 
 let modelId = "aufklarer/Qwen3-ASR-0.6B-MLX-4bit"
+
+/// Maps language argument to API parameter. "auto" → nil (auto-detect, supports code-switching).
+func resolveLanguage(_ arg: String) -> String? {
+    arg == "auto" ? nil : arg
+}
 
 // MARK: - Timing Helpers
 
@@ -69,7 +74,7 @@ func loadVADModel() async throws -> (SileroVADModel, Duration) {
 
 // MARK: - File Mode
 
-func runFileMode(path: String, language: String) async throws {
+func runFileMode(path: String, language: String?) async throws {
     print("=== SpeechSwiftTestCLI — File Mode ===")
     print("Audio:   \(path)")
     print("Sprache: \(language)")
@@ -126,7 +131,7 @@ func runFileMode(path: String, language: String) async throws {
 
 // MARK: - Live Mode
 
-func runLiveMode(language: String) async throws {
+func runLiveMode(language: String?) async throws {
     print("=== SpeechSwiftTestCLI — Live Mode ===")
     print("Sprache: \(language)")
     print("")
@@ -263,9 +268,35 @@ func runLiveMode(language: String) async throws {
 final class StreamState: @unchecked Sendable {
     var vadCursor: Int = 0
     var segmentTexts: [(text: String, sttDuration: Duration, startTime: Float, endTime: Float)] = []
+    var currentSpeechStartTime: Float? = nil  // Track ongoing speech for force-split
+    var lastTranscribedEnd: Float = 0  // Prevents double-transcription after force-split
+    var pendingAudioStart: Float? = nil  // Accumulate short segments until minSegmentDuration reached
+
+    /// Transcribe a segment and append to results. Context only for segments > 1s to avoid hallucination.
+    func transcribeAndAppend(
+        audio: [Float], startTime: Float, endTime: Float,
+        model: Qwen3ASRModel, language: String?, label: String
+    ) {
+        let segmentDuration = endTime - startTime
+        // Only pass context for segments > 1s — very short segments hallucinate with long context
+        let context: String? = segmentDuration > 1.0 ? segmentTexts.last?.text : nil
+
+        let sttStart = ContinuousClock.now
+        let text = model.transcribe(
+            audio: audio,
+            sampleRate: 16000,
+            language: language,
+            context: context
+        )
+        let sttTime = ContinuousClock.now - sttStart
+
+        segmentTexts.append((text: text, sttDuration: sttTime, startTime: startTime, endTime: endTime))
+        lastTranscribedEnd = endTime
+        print("  [Segment \(segmentTexts.count)] \"\(text)\" (\(label)\(String(format: "%.1f", startTime))-\(String(format: "%.1f", endTime))s, STT: \(formatMs(sttTime)))")
+    }
 }
 
-func runStreamMode(language: String) async throws {
+func runStreamMode(language: String?) async throws {
     print("=== SpeechSwiftTestCLI — Stream Mode ===")
     print("Sprache: \(language)")
     print("Real-time VAD + Segment-Transkription")
@@ -274,9 +305,19 @@ func runStreamMode(language: String) async throws {
     // 1. Load models
     let (asrModel, _) = try await loadASRModel()
     let (vadModel, _) = try await loadVADModel()
-    let processor = StreamingVADProcessor(model: vadModel)
+    let vadConfig = VADConfig(
+        onset: 0.5,
+        offset: 0.35,
+        minSpeechDuration: 0.25,
+        minSilenceDuration: 0.4,   // 400ms — Kompromiss: Atempausen ignorieren, Sprechpausen erkennen
+        windowDuration: 0.032,
+        stepRatio: 1.0
+    )
+    let processor = StreamingVADProcessor(model: vadModel, config: vadConfig)
+    let maxSegmentSeconds: Float = 7.0   // Force-Split nach 7s — STT ~655ms, gute Qualität
+    let minSegmentSeconds: Float = 3.0   // Segmente < 3s nicht einzeln transkribieren
 
-    print("\nBereit. Modelle geladen.")
+    print("\nBereit. (minSilence: \(vadConfig.minSilenceDuration)s, minSegment: \(minSegmentSeconds)s, maxSegment: \(maxSegmentSeconds)s)")
     print("───────────────────────────────────")
 
     // 2. Recording loop
@@ -361,32 +402,60 @@ func runStreamMode(language: String) async throws {
                     for event in events {
                         switch event {
                         case .speechStarted(let time):
+                            state.currentSpeechStartTime = time
                             print("  [VAD \(String(format: "%.1f", time))s] Sprache erkannt")
                         case .speechEnded(let segment):
-                            // Extract segment audio from full buffer
+                            state.currentSpeechStartTime = nil
+                            let effectiveStart = max(segment.startTime, state.lastTranscribedEnd)
+                            let segmentDuration = segment.endTime - effectiveStart
+                            guard segmentDuration > 0.1 else { continue }
+
+                            // Accumulate start from pending or this segment
+                            let accumulatedStart = state.pendingAudioStart ?? effectiveStart
+
+                            if (segment.endTime - accumulatedStart) < minSegmentSeconds {
+                                // Too short — defer, will be merged with next segment or flushed at stop
+                                if state.pendingAudioStart == nil {
+                                    state.pendingAudioStart = accumulatedStart
+                                }
+                                print("  [VAD \(String(format: "%.1f", segment.endTime))s] Segment zu kurz (\(String(format: "%.1f", segment.endTime - accumulatedStart))s), sammle weiter")
+                                continue
+                            }
+
+                            // Long enough — transcribe from accumulated start
+                            state.pendingAudioStart = nil
                             let allSamples = sampleBuffer.samples
-                            let startIdx = max(0, Int(segment.startTime * 16000))
+                            let startIdx = max(0, Int(accumulatedStart * 16000))
                             let endIdx = min(Int(segment.endTime * 16000), allSamples.count)
-                            guard startIdx < endIdx else { continue }
+                            guard endIdx - startIdx > 1600 else { continue }
                             let segmentAudio = Array(allSamples[startIdx..<endIdx])
 
-                            // Transcribe this segment immediately
-                            let sttStart = ContinuousClock.now
-                            let text = asrRef.transcribe(
-                                audio: segmentAudio,
-                                sampleRate: 16000,
-                                language: language
+                            state.transcribeAndAppend(
+                                audio: segmentAudio, startTime: accumulatedStart, endTime: segment.endTime,
+                                model: asrRef, language: language, label: ""
                             )
-                            let sttTime = ContinuousClock.now - sttStart
+                        }
+                    }
 
-                            state.segmentTexts.append((
-                                text: text,
-                                sttDuration: sttTime,
-                                startTime: segment.startTime,
-                                endTime: segment.endTime
-                            ))
+                    // Force-split: if untranscribed audio exceeds maxSegmentSeconds
+                    if let speechStart = state.currentSpeechStartTime {
+                        let effectiveStart = state.pendingAudioStart ?? max(speechStart, state.lastTranscribedEnd)
+                        let currentTime = Float(state.vadCursor) / 16000.0
+                        let untranscribedDuration = currentTime - effectiveStart
+                        if untranscribedDuration >= maxSegmentSeconds {
+                            let allSamples = sampleBuffer.samples
+                            let startIdx = max(0, Int(effectiveStart * 16000))
+                            let endIdx = allSamples.count
+                            guard endIdx - startIdx > 1600 else { continue }
+                            let segmentAudio = Array(allSamples[startIdx..<endIdx])
 
-                            print("  [Segment \(state.segmentTexts.count)] \"\(text)\" (\(String(format: "%.1f", segment.startTime))-\(String(format: "%.1f", segment.endTime))s, STT: \(formatMs(sttTime)))")
+                            state.pendingAudioStart = nil
+                            state.transcribeAndAppend(
+                                audio: segmentAudio, startTime: effectiveStart, endTime: currentTime,
+                                model: asrRef, language: language, label: "force-split, "
+                            )
+
+                            state.currentSpeechStartTime = currentTime
                         }
                     }
                 }
@@ -411,44 +480,29 @@ func runStreamMode(language: String) async throws {
         // Small delay to let the task clean up
         try await Task.sleep(for: .milliseconds(50))
 
-        // Process remaining audio through VAD
+        // Process remaining audio through VAD + flush
         let remainingSamples = sampleBuffer.samples(from: state.vadCursor)
         if !remainingSamples.isEmpty {
-            let events = processor.process(samples: remainingSamples)
-            for event in events {
-                if case .speechEnded(let segment) = event {
-                    let allSamples = sampleBuffer.samples
-                    let startIdx = max(0, Int(segment.startTime * 16000))
-                    let endIdx = min(Int(segment.endTime * 16000), allSamples.count)
-                    guard startIdx < endIdx else { continue }
-                    let segmentAudio = Array(allSamples[startIdx..<endIdx])
-
-                    let sttStart = ContinuousClock.now
-                    let text = asrModel.transcribe(audio: segmentAudio, sampleRate: 16000, language: language)
-                    let sttTime = ContinuousClock.now - sttStart
-
-                    state.segmentTexts.append((text: text, sttDuration: sttTime, startTime: segment.startTime, endTime: segment.endTime))
-                    print("  [Segment \(state.segmentTexts.count)] \"\(text)\" (\(String(format: "%.1f", segment.startTime))-\(String(format: "%.1f", segment.endTime))s, STT: \(formatMs(sttTime)))")
-                }
-            }
+            _ = processor.process(samples: remainingSamples)
         }
-
-        // Flush VAD to catch any remaining speech
         let flushEvents = processor.flush()
-        for event in flushEvents {
-            if case .speechEnded(let segment) = event {
-                let allSamples = sampleBuffer.samples
-                let startIdx = max(0, Int(segment.startTime * 16000))
-                let endIdx = min(Int(segment.endTime * 16000), allSamples.count)
-                guard startIdx < endIdx else { continue }
-                let segmentAudio = Array(allSamples[startIdx..<endIdx])
 
-                let sttStart = ContinuousClock.now
-                let text = asrModel.transcribe(audio: segmentAudio, sampleRate: 16000, language: language)
-                let sttTime = ContinuousClock.now - sttStart
+        // At stop: transcribe everything from lastTranscribedEnd (or pendingAudioStart) to end
+        // No minSegment restriction — flush everything
+        let finalStart = state.pendingAudioStart ?? state.lastTranscribedEnd
+        let allSamplesForFlush = sampleBuffer.samples
+        let audioDurationTotal = Float(allSamplesForFlush.count) / 16000.0
 
-                state.segmentTexts.append((text: text, sttDuration: sttTime, startTime: segment.startTime, endTime: segment.endTime))
-                print("  [Segment \(state.segmentTexts.count)] \"\(text)\" (flush, \(String(format: "%.1f", segment.startTime))-\(String(format: "%.1f", segment.endTime))s, STT: \(formatMs(sttTime)))")
+        if finalStart < audioDurationTotal - 0.1 {
+            let startIdx = max(0, Int(finalStart * 16000))
+            let endIdx = allSamplesForFlush.count
+            if endIdx - startIdx > 1600 {
+                let segmentAudio = Array(allSamplesForFlush[startIdx..<endIdx])
+                state.pendingAudioStart = nil
+                state.transcribeAndAppend(
+                    audio: segmentAudio, startTime: finalStart, endTime: audioDurationTotal,
+                    model: asrModel, language: language, label: "flush, "
+                )
             }
         }
 
@@ -495,7 +549,7 @@ struct BatchResult {
     let expected: String?
 }
 
-func runBatchMode(directory: String, language: String) async throws {
+func runBatchMode(directory: String, language: String?) async throws {
     print("=== SpeechSwiftTestCLI — Batch Mode ===")
     print("Verzeichnis: \(directory)")
     print("Sprache:     \(language)")
@@ -636,16 +690,16 @@ Task {
                 print(usage)
                 exit(1)
             }
-            let language = CommandLine.arguments.count > 3 ? CommandLine.arguments[3] : "de"
-            try await runFileMode(path: path, language: language)
+            let lang = resolveLanguage(CommandLine.arguments.count > 3 ? CommandLine.arguments[3] : "de")
+            try await runFileMode(path: path, language: lang)
 
         case "live":
-            let language = CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : "de"
-            try await runLiveMode(language: language)
+            let lang = resolveLanguage(CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : "de")
+            try await runLiveMode(language: lang)
 
         case "stream":
-            let language = CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : "de"
-            try await runStreamMode(language: language)
+            let lang = resolveLanguage(CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : "de")
+            try await runStreamMode(language: lang)
 
         case "batch":
             let dir = CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : ""
@@ -654,8 +708,8 @@ Task {
                 print(usage)
                 exit(1)
             }
-            let language = CommandLine.arguments.count > 3 ? CommandLine.arguments[3] : "de"
-            try await runBatchMode(directory: dir, language: language)
+            let lang = resolveLanguage(CommandLine.arguments.count > 3 ? CommandLine.arguments[3] : "de")
+            try await runBatchMode(directory: dir, language: lang)
 
         default:
             print("Unbekannter Modus: \(mode)")
