@@ -13,6 +13,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "0.12.0"),
         .package(url: "https://github.com/sparkle-project/Sparkle.git", from: "2.7.0"),
+        .package(url: "https://github.com/soniqo/speech-swift", branch: "main"),
     ],
     targets: [
         .target(
@@ -103,6 +104,14 @@ let package = Package(
             name: "WhisperCppTestCLI",
             dependencies: ["DerFluisterer"],
             path: "Tools/WhisperCppTestCLI"
+        ),
+        .executableTarget(
+            name: "SpeechSwiftTestCLI",
+            dependencies: [
+                .product(name: "Qwen3ASR", package: "speech-swift"),
+                .product(name: "SpeechVAD", package: "speech-swift"),
+            ],
+            path: "Tools/SpeechSwiftTestCLI"
         ),
         .testTarget(
             name: "DerFluistererTests",
