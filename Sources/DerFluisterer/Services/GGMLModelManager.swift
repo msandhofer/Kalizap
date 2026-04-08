@@ -109,6 +109,161 @@ public final class GGMLModelManager: Sendable {
         }
     }
 
+    // MARK: - CoreML Encoder
+
+    /// Returns the encoder directory name that whisper.cpp expects.
+    /// whisper.cpp strips quantization suffixes (-q5_0 etc.) before looking for the encoder.
+    public static func coremlEncoderDirName(for model: WhisperModel) -> String {
+        switch model {
+        case .tiny: "ggml-tiny-encoder.mlmodelc"
+        case .base: "ggml-base-encoder.mlmodelc"
+        case .small: "ggml-small-encoder.mlmodelc"
+        case .largeV3: "ggml-large-v3-encoder.mlmodelc"
+        case .largeV3Turbo: "ggml-large-v3-turbo-encoder.mlmodelc"
+        case .largeV3TurboQ5_0: "ggml-large-v3-turbo-encoder.mlmodelc" // shares encoder with F16
+        case .germanTurbo: "ggml-large-v3-turbo-german-encoder.mlmodelc"
+        }
+    }
+
+    public func coremlEncoderURL(for model: WhisperModel) -> URL {
+        baseURL.appendingPathComponent(Self.coremlEncoderDirName(for: model))
+    }
+
+    private func coremlEncoderDisabledURL(for model: WhisperModel) -> URL {
+        baseURL.appendingPathComponent(Self.coremlEncoderDirName(for: model) + ".disabled")
+    }
+
+    public func isCoreMLEncoderAvailable(for model: WhisperModel) -> Bool {
+        let url = coremlEncoderURL(for: model)
+        var isDir: ObjCBool = false
+        return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) && isDir.boolValue
+    }
+
+    /// Enables or disables the CoreML encoder by renaming the directory.
+    /// Returns the active encoder URL if enabled, nil if disabled.
+    @discardableResult
+    public func setCoreMLEncoderEnabled(_ enabled: Bool, for model: WhisperModel) throws -> URL? {
+        let activeURL = coremlEncoderURL(for: model)
+        let disabledURL = coremlEncoderDisabledURL(for: model)
+        let fm = FileManager.default
+
+        if enabled {
+            // Rename .disabled back to active
+            if !fm.fileExists(atPath: activeURL.path), fm.fileExists(atPath: disabledURL.path) {
+                try fm.moveItem(at: disabledURL, to: activeURL)
+                logger.info("CoreML encoder enabled: \(activeURL.lastPathComponent)")
+            }
+            return fm.fileExists(atPath: activeURL.path) ? activeURL : nil
+        } else {
+            // Rename active to .disabled
+            if fm.fileExists(atPath: activeURL.path) {
+                try fm.moveItem(at: activeURL, to: disabledURL)
+                logger.info("CoreML encoder disabled: \(disabledURL.lastPathComponent)")
+            }
+            return nil
+        }
+    }
+
+    public func downloadCoreMLEncoder(
+        for model: WhisperModel,
+        onProgress: @Sendable @escaping (Double) -> Void
+    ) async throws -> URL {
+        let destination = coremlEncoderURL(for: model)
+
+        // Already downloaded (active or disabled)?
+        if isCoreMLEncoderAvailable(for: model) {
+            logger.info("CoreML encoder already present: \(destination.lastPathComponent)")
+            onProgress(0.9)
+            return destination
+        }
+        // Check if disabled copy exists — just re-enable it
+        let disabledURL = coremlEncoderDisabledURL(for: model)
+        if FileManager.default.fileExists(atPath: disabledURL.path) {
+            try FileManager.default.moveItem(at: disabledURL, to: destination)
+            logger.info("CoreML encoder re-enabled from disabled: \(destination.lastPathComponent)")
+            onProgress(0.9)
+            return destination
+        }
+
+        try FileManager.default.createDirectory(at: baseURL, withIntermediateDirectories: true)
+
+        let remoteURL = Self.coremlDownloadURL(for: model)
+        logger.info("Downloading CoreML encoder: \(remoteURL.absoluteString)")
+
+        let delegate = DownloadProgressDelegate(onProgress: onProgress)
+        let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+
+        let (tempZipURL, response) = try await session.download(from: remoteURL)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw GGMLModelError.downloadFailed(statusCode: statusCode)
+        }
+
+        // Unzip to temporary directory
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        process.arguments = ["-o", "-q", tempZipURL.path, "-d", tempDir.path]
+        try process.run()
+        process.waitUntilExit()
+
+        // Clean up zip
+        try? FileManager.default.removeItem(at: tempZipURL)
+
+        guard process.terminationStatus == 0 else {
+            try? FileManager.default.removeItem(at: tempDir)
+            throw GGMLModelError.coremlUnzipFailed
+        }
+
+        // Find the .mlmodelc directory in unzipped contents
+        let contents = try FileManager.default.contentsOfDirectory(at: tempDir, includingPropertiesForKeys: nil)
+        guard let mlmodelcDir = contents.first(where: { $0.pathExtension == "mlmodelc" }) else {
+            try? FileManager.default.removeItem(at: tempDir)
+            throw GGMLModelError.coremlModelNotFound
+        }
+
+        // Move to final destination
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.removeItem(at: destination)
+        }
+        try FileManager.default.moveItem(at: mlmodelcDir, to: destination)
+        try? FileManager.default.removeItem(at: tempDir)
+
+        logger.info("CoreML encoder saved: \(destination.path)")
+        onProgress(0.9)
+        return destination
+    }
+
+    public func deleteCoreMLEncoder(for model: WhisperModel) throws {
+        let fm = FileManager.default
+        let activeURL = coremlEncoderURL(for: model)
+        let disabledURL = coremlEncoderDisabledURL(for: model)
+        if fm.fileExists(atPath: activeURL.path) {
+            try fm.removeItem(at: activeURL)
+        }
+        if fm.fileExists(atPath: disabledURL.path) {
+            try fm.removeItem(at: disabledURL)
+        }
+    }
+
+    public static func coremlDownloadURL(for model: WhisperModel) -> URL {
+        let zipName: String
+        switch model {
+        case .tiny: zipName = "ggml-tiny-encoder.mlmodelc.zip"
+        case .base: zipName = "ggml-base-encoder.mlmodelc.zip"
+        case .small: zipName = "ggml-small-encoder.mlmodelc.zip"
+        case .largeV3: zipName = "ggml-large-v3-encoder.mlmodelc.zip"
+        case .largeV3Turbo: zipName = "ggml-large-v3-turbo-encoder.mlmodelc.zip"
+        case .largeV3TurboQ5_0: zipName = "ggml-large-v3-turbo-encoder.mlmodelc.zip"
+        case .germanTurbo: zipName = "ggml-large-v3-turbo-encoder.mlmodelc.zip" // same encoder architecture
+        }
+        return URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/\(zipName)")!
+    }
+
     // MARK: - Mapping
 
     public static func ggmlFileName(for model: WhisperModel) -> String {
@@ -118,12 +273,19 @@ public final class GGMLModelManager: Sendable {
         case .small: "ggml-small.bin"
         case .largeV3: "ggml-large-v3.bin"
         case .largeV3Turbo: "ggml-large-v3-turbo.bin"
+        case .largeV3TurboQ5_0: "ggml-large-v3-turbo-q5_0.bin"
+        case .germanTurbo: "ggml-large-v3-turbo-german.bin"
         }
     }
 
     public static func downloadURL(for model: WhisperModel) -> URL {
-        let fileName = ggmlFileName(for: model)
-        return URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/\(fileName)")!
+        switch model {
+        case .germanTurbo:
+            return URL(string: "https://huggingface.co/cstr/whisper-large-v3-turbo-german-ggml/resolve/main/ggml-model.bin")!
+        default:
+            let fileName = ggmlFileName(for: model)
+            return URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/\(fileName)")!
+        }
     }
 }
 
@@ -131,11 +293,17 @@ public final class GGMLModelManager: Sendable {
 
 public enum GGMLModelError: Error, LocalizedError {
     case downloadFailed(statusCode: Int)
+    case coremlUnzipFailed
+    case coremlModelNotFound
 
     public var errorDescription: String? {
         switch self {
         case .downloadFailed(let statusCode):
             "GGML model download failed (HTTP \(statusCode))"
+        case .coremlUnzipFailed:
+            "CoreML encoder zip could not be extracted"
+        case .coremlModelNotFound:
+            "CoreML encoder .mlmodelc not found in downloaded zip"
         }
     }
 }

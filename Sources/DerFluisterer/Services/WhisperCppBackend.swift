@@ -8,11 +8,13 @@ public final class WhisperCppBackend: WhisperBackend, @unchecked Sendable {
     private var ctx: OpaquePointer? // whisper_context*
     private var vadCtx: OpaquePointer? // whisper_vad_context*
     private let modelName: String
+    private let useCoreML: Bool
     private var languagePointer: UnsafeMutablePointer<CChar>?
     private var promptPointer: UnsafeMutablePointer<CChar>?
 
-    public init(model: String = "base") {
+    public init(model: String = "base", useCoreML: Bool = false) {
         self.modelName = model
+        self.useCoreML = useCoreML
     }
 
     deinit {
@@ -29,7 +31,7 @@ public final class WhisperCppBackend: WhisperBackend, @unchecked Sendable {
             throw TranscriptionError.modelLoadFailed(reason: "Unknown model: \(modelName)")
         }
 
-        FileLog.log("WhisperCppBackend.loadModel START — model=\(modelName)")
+        FileLog.log("WhisperCppBackend.loadModel START — model=\(modelName), coreml=\(useCoreML)")
         do {
             // Download Whisper model + VAD model (sequential to avoid withoutActuallyEscaping + async let crash)
             let modelURL = try await withoutActuallyEscaping(onProgress) { escapingProgress in
@@ -38,6 +40,16 @@ public final class WhisperCppBackend: WhisperBackend, @unchecked Sendable {
             let vadURL = try await GGMLModelManager.shared.downloadVADModel { _ in }
             FileLog.log("  GGML model ready at \(modelURL.path)")
             FileLog.log("  VAD model ready at \(vadURL.path)")
+
+            // CoreML encoder: download if enabled, disable if not
+            if useCoreML {
+                let coremlURL = try await GGMLModelManager.shared.downloadCoreMLEncoder(for: model) { _ in }
+                try GGMLModelManager.shared.setCoreMLEncoderEnabled(true, for: model)
+                FileLog.log("  CoreML encoder ready at \(coremlURL.path)")
+            } else {
+                try? GGMLModelManager.shared.setCoreMLEncoderEnabled(false, for: model)
+                FileLog.log("  CoreML disabled")
+            }
 
             var ctxParams = whisper_context_default_params()
             ctxParams.use_gpu = true
@@ -76,9 +88,14 @@ public final class WhisperCppBackend: WhisperBackend, @unchecked Sendable {
         params.suppress_blank = true
         params.temperature_inc = 0
 
-        let melFrames = Int(ceil(Double(samples.count) / 16000.0 * 100.0))
-        let aligned = ((melFrames + 63) / 64) * 64
-        params.audio_ctx = Int32(max(768, min(aligned, 1500)))
+        if !useCoreML {
+            // Optimize audio_ctx for Metal/CPU — smaller context = faster for short audio
+            let melFrames = Int(ceil(Double(samples.count) / 16000.0 * 100.0))
+            let aligned = ((melFrames + 63) / 64) * 64
+            params.audio_ctx = Int32(max(768, min(aligned, 1500)))
+        }
+        // CoreML: leave audio_ctx at 0 (default = full 1500 frames) — CoreML encoder
+        // is compiled for fixed input size and produces garbage with truncated input
 
         freeStringPointers()
         languagePointer = strdup(language)
@@ -95,23 +112,29 @@ public final class WhisperCppBackend: WhisperBackend, @unchecked Sendable {
         let capturedParams = params
 
         let result: WhisperTranscriptionResult = try await Task.detached(priority: .userInitiated) {
+            // Fresh state per transcription — prevents encoder state leaking between calls
+            guard let state = whisper_init_state(unsafeCtx) else {
+                throw TranscriptionError.batchFailed(reason: "whisper_init_state returned nil")
+            }
+            defer { whisper_free_state(state) }
+
             let ret = samples.withUnsafeBufferPointer { buf in
-                whisper_full(unsafeCtx, capturedParams, buf.baseAddress, Int32(buf.count))
+                whisper_full_with_state(unsafeCtx, state, capturedParams, buf.baseAddress, Int32(buf.count))
             }
 
             guard ret == 0 else {
-                throw TranscriptionError.batchFailed(reason: "whisper_full returned \(ret)")
+                throw TranscriptionError.batchFailed(reason: "whisper_full_with_state returned \(ret)")
             }
 
-            let nSegments = whisper_full_n_segments(unsafeCtx)
+            let nSegments = whisper_full_n_segments_from_state(state)
             var segments: [TranscriptionSegment] = []
             var fullText = ""
 
             for i in 0..<nSegments {
-                guard let cText = whisper_full_get_segment_text(unsafeCtx, i) else { continue }
+                guard let cText = whisper_full_get_segment_text_from_state(state, i) else { continue }
                 let text = String(cString: cText)
-                let t0 = whisper_full_get_segment_t0(unsafeCtx, i) * 10 // centiseconds → milliseconds
-                let t1 = whisper_full_get_segment_t1(unsafeCtx, i) * 10
+                let t0 = whisper_full_get_segment_t0_from_state(state, i) * 10 // centiseconds → milliseconds
+                let t1 = whisper_full_get_segment_t1_from_state(state, i) * 10
 
                 fullText += text
                 segments.append(TranscriptionSegment(

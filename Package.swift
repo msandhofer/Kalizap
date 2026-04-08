@@ -41,6 +41,8 @@ let package = Package(
                 .linkedFramework("Accelerate"),
                 .linkedFramework("Metal"),
                 .linkedFramework("MetalKit"),
+                .linkedFramework("CoreML"),
+                .linkedFramework("Foundation"),
             ]
         ),
         .target(
@@ -125,6 +127,11 @@ let package = Package(
         .testTarget(
             name: "DerFluistererTests",
             dependencies: ["DerFluisterer"]
+        ),
+        .testTarget(
+            name: "STTTestCommonTests",
+            dependencies: ["STTTestCommon"],
+            path: "Tests/STTTestCommonTests"
         ),
     ]
 )

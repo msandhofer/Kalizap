@@ -36,7 +36,7 @@ func runSweepMode(args: SweepArgs) async throws {
 
     // 2. Load models (einmalig)
     let lang: TranscriptionLanguage = args.language == "en" ? .english : .german
-    let (backend, _) = try await loadWhisperCppModel(name: args.modelName, language: lang)
+    let (backend, _) = try await loadWhisperCppModel(name: args.modelName, language: lang, coreml: args.coreml)
     let (vadModel, _) = try await loadVADModel()
 
     // 3. Parameter grid

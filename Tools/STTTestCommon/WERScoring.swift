@@ -36,6 +36,9 @@ public enum WERScoring {
         guard n > 0 else {
             return WERResult(substitutions: 0, insertions: m, deletions: 0, referenceCount: 0)
         }
+        guard m > 0 else {
+            return WERResult(substitutions: 0, insertions: 0, deletions: n, referenceCount: n)
+        }
 
         // Dynamic programming matrix: dp[i][j] = edit distance between ref[0..<i] and hyp[0..<j]
         // To save memory, we only keep two rows.

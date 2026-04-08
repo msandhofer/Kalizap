@@ -34,10 +34,10 @@ func printTimingTable(_ entries: [(String, String)]) {
 
 // MARK: - Model Loading
 
-func loadWhisperCppModel(name: String, language: TranscriptionLanguage) async throws -> (WhisperCppBackend, Duration) {
-    print("Lade whisper.cpp Modell (\(name))...")
+func loadWhisperCppModel(name: String, language: TranscriptionLanguage, coreml: Bool = false) async throws -> (WhisperCppBackend, Duration) {
+    print("Lade whisper.cpp Modell (\(name)\(coreml ? ", CoreML" : ""))...")
     let start = ContinuousClock.now
-    let backend = WhisperCppBackend(model: name)
+    let backend = WhisperCppBackend(model: name, useCoreML: coreml)
     try await backend.loadModel(for: language) { progress in
         let pct = Int(progress * 100)
         print("  \(pct)%")

@@ -2,6 +2,13 @@ import Foundation
 
 // MARK: - CLI Flag Parsing
 
+struct BatchArgs {
+    let directory: String
+    let language: String?
+    let modelName: String
+    let coreml: Bool
+}
+
 struct StreamFileArgs {
     let audioPath: String
     let language: String?
@@ -10,6 +17,7 @@ struct StreamFileArgs {
     let maxSegment: Float
     let minSilence: Double
     let json: Bool
+    let coreml: Bool
 }
 
 struct SweepArgs {
@@ -17,6 +25,7 @@ struct SweepArgs {
     let language: String?
     let modelName: String
     let json: Bool
+    let coreml: Bool
 }
 
 func parseFlags(from startIndex: Int) -> [String: String] {
@@ -26,8 +35,8 @@ func parseFlags(from startIndex: Int) -> [String: String] {
     while i < args.count {
         if args[i].hasPrefix("--") {
             let key = String(args[i].dropFirst(2))
-            if key == "json" {
-                flags["json"] = "true"
+            if key == "json" || key == "coreml" {
+                flags[key] = "true"
                 i += 1
             } else if i + 1 < args.count {
                 flags[key] = args[i + 1]
@@ -40,6 +49,32 @@ func parseFlags(from startIndex: Int) -> [String: String] {
         }
     }
     return flags
+}
+
+func parseBatchArgs() -> BatchArgs {
+    let args = CommandLine.arguments
+    let dir = args.count > 2 ? args[2] : ""
+    guard !dir.isEmpty else {
+        print("Fehler: Verzeichnis-Pfad erforderlich.")
+        print("Usage: swift run WhisperCppTestCLI batch <directory> [de|en|auto] [--model base]")
+        exit(1)
+    }
+
+    let langArg: String
+    if args.count > 3, !args[3].hasPrefix("--") {
+        langArg = args[3]
+    } else {
+        langArg = "de"
+    }
+    let flagStart = args.count > 3 && !args[3].hasPrefix("--") ? 4 : 3
+    let flags = parseFlags(from: flagStart)
+
+    return BatchArgs(
+        directory: dir,
+        language: resolveLanguage(langArg),
+        modelName: flags["model"] ?? "base",
+        coreml: flags["coreml"] != nil
+    )
 }
 
 func parseStreamFileArgs() -> StreamFileArgs {
@@ -67,7 +102,8 @@ func parseStreamFileArgs() -> StreamFileArgs {
         minSegment: Float(flags["min-segment"] ?? "") ?? 3.0,
         maxSegment: Float(flags["max-segment"] ?? "") ?? 7.0,
         minSilence: Double(flags["min-silence"] ?? "") ?? 0.4,
-        json: flags["json"] != nil
+        json: flags["json"] != nil,
+        coreml: flags["coreml"] != nil
     )
 }
 
@@ -93,6 +129,7 @@ func parseSweepArgs() -> SweepArgs {
         directory: dir,
         language: resolveLanguage(langArg),
         modelName: flags["model"] ?? "base",
-        json: flags["json"] != nil
+        json: flags["json"] != nil,
+        coreml: flags["coreml"] != nil
     )
 }

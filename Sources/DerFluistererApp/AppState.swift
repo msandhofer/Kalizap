@@ -109,18 +109,21 @@ final class AppState {
         lastObservedModel = settings.audio.whisperModel
         lastObservedNS = settings.audio.noiseSuppressionEnabled
         lastObservedEngine = settings.audio.whisperEngine
+        lastObservedCoreML = settings.audio.useCoreML
         scheduleObservation()
     }
 
     private var lastObservedModel: WhisperModel = .largeV3Turbo
     private var lastObservedNS: Bool = true
     private var lastObservedEngine: WhisperEngine = .whisperCpp
+    private var lastObservedCoreML: Bool = false
 
     private func scheduleObservation() {
         withObservationTracking {
             _ = settings.audio.whisperModel
             _ = settings.audio.noiseSuppressionEnabled
             _ = settings.audio.whisperEngine
+            _ = settings.audio.useCoreML
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -130,11 +133,13 @@ final class AppState {
                 let newModel = self.settings.audio.whisperModel
                 let newNS = self.settings.audio.noiseSuppressionEnabled
                 let newEngine = self.settings.audio.whisperEngine
-                if newModel != self.lastObservedModel || newNS != self.lastObservedNS || newEngine != self.lastObservedEngine {
-                    FileLog.log("AppState — settings changed: model=\(newModel.rawValue) engine=\(newEngine.rawValue) ns=\(newNS)")
+                let newCoreML = self.settings.audio.useCoreML
+                if newModel != self.lastObservedModel || newNS != self.lastObservedNS || newEngine != self.lastObservedEngine || newCoreML != self.lastObservedCoreML {
+                    FileLog.log("AppState — settings changed: model=\(newModel.rawValue) engine=\(newEngine.rawValue) ns=\(newNS) coreml=\(newCoreML)")
                     self.lastObservedModel = newModel
                     self.lastObservedNS = newNS
                     self.lastObservedEngine = newEngine
+                    self.lastObservedCoreML = newCoreML
                     await self.restartPipeline()
                 }
             }
