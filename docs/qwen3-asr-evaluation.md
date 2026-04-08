@@ -219,7 +219,39 @@ Wispr Flow ist 100% Cloud-basiert mit ~700ms E2E-Latenz (ASR ~200ms + LLM ~200ms
 
 ---
 
-## 7. Offene Fragen
+## 7. Quantisierungs-Vergleich (4-bit vs 8-bit)
+
+Getestet am 2026-04-08 mit `aufklarer/Qwen3-ASR-0.6B-MLX-8bit` (~1.2GB).
+
+### Geschwindigkeit
+
+| Datei | Audio | 4-bit STT | 8-bit STT | Faktor |
+|-------|-------|-----------|-----------|--------|
+| Testaufnahme4 | 1.4s | 165ms | 672ms | 4.1x langsamer |
+| Testaufnahme1 | 8.5s | 604ms | 832ms | 1.4x langsamer |
+| Testaufnahme5 | 14.1s | 951ms | 1430ms | 1.5x langsamer |
+| Testaufnahme2 | 38.4s | 3302ms | 5864ms | 1.8x langsamer |
+
+Durchschnittlich ~1.5x langsamer (nach Warmup). RTF steigt von 0.07-0.10 auf 0.10-0.15.
+
+### Qualitaet
+
+Kein messbarer Unterschied. Gleiche Fehler bei beiden Varianten:
+- "Hodenkompost" (4-bit und 8-bit identisch)
+- "Textdeck" statt "Techstack" (identisch)
+- Match-Rate: 2/5 bei beiden
+
+### Fazit
+
+8-bit bringt keinen Qualitaetsgewinn bei ~50% hoeherer Latenz.
+Die Quantisierung ist nicht der Qualitaets-Hebel — Kontext (Segment-Laenge) ist entscheidender.
+
+Hinweis: MLX laeuft auf der GPU (Metal), nicht auf dem Neural Engine (ANE).
+ANE wird nur von CoreML-Modellen genutzt (z.B. Silero VAD).
+
+---
+
+## 8. Offene Fragen
 
 1. **LLM Post-Processing:** Wie stark verbessert ein lokales LLM (z.B. Llama 3.2 3B) die Transkriptionsqualitaet? Kann es "Forstblätter" → "Force Split" korrigieren?
 
