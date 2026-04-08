@@ -100,14 +100,23 @@ let package = Package(
             dependencies: [],
             path: "Tools/ToastTestCLI"
         ),
+        .target(
+            name: "STTTestCommon",
+            path: "Tools/STTTestCommon"
+        ),
         .executableTarget(
             name: "WhisperCppTestCLI",
-            dependencies: ["DerFluisterer"],
+            dependencies: [
+                "DerFluisterer",
+                "STTTestCommon",
+                .product(name: "SpeechVAD", package: "speech-swift"),
+            ],
             path: "Tools/WhisperCppTestCLI"
         ),
         .executableTarget(
             name: "SpeechSwiftTestCLI",
             dependencies: [
+                "STTTestCommon",
                 .product(name: "Qwen3ASR", package: "speech-swift"),
                 .product(name: "SpeechVAD", package: "speech-swift"),
             ],

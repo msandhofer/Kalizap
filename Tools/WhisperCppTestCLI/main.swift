@@ -1,109 +1,48 @@
 import Foundation
-import AVFoundation
-import DerFluisterer
 
-// MARK: - Configuration
+// MARK: - WhisperCppTestCLI Entry Point
 
-let modelName = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "tiny"
-let audioPath = CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : "TestAudio.m4a"
+let usage = """
+Usage:
+  swift run WhisperCppTestCLI transcribe [model] [audio-path]
+  swift run WhisperCppTestCLI stream-file <audio-path> [de|en|auto] [--model base] [--min-segment 3] [--max-segment 7] [--min-silence 0.4] [--json]
+  swift run WhisperCppTestCLI sweep <directory> [de|en|auto] [--model base] [--json]
+"""
 
-print("=== WhisperCppTestCLI ===")
-print("Modell:  \(modelName)")
-print("Audio:   \(audioPath)")
-print("")
+let mode = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : ""
 
-// MARK: - Audio Loading
-
-func loadAudioSamples(from path: String) throws -> [Float] {
-    let url = URL(fileURLWithPath: path)
-    let file = try AVAudioFile(forReading: url)
-
-    let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)!
-    guard let converter = AVAudioConverter(from: file.processingFormat, to: targetFormat) else {
-        throw NSError(domain: "WhisperCppTestCLI", code: 1, userInfo: [NSLocalizedDescriptionKey: "Cannot create audio converter"])
-    }
-
-    let frameCount = AVAudioFrameCount(Double(file.length) * 16000.0 / file.processingFormat.sampleRate)
-    guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: frameCount) else {
-        throw NSError(domain: "WhisperCppTestCLI", code: 2, userInfo: [NSLocalizedDescriptionKey: "Cannot create output buffer"])
-    }
-
-    var error: NSError?
-    converter.convert(to: outputBuffer, error: &error) { _, outStatus in
-        let inputFrameCount = min(file.length - file.framePosition, Int64(4096))
-        guard inputFrameCount > 0 else {
-            outStatus.pointee = .endOfStream
-            return nil
-        }
-        guard let inputBuffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(inputFrameCount)) else {
-            outStatus.pointee = .endOfStream
-            return nil
-        }
-        do {
-            try file.read(into: inputBuffer)
-            outStatus.pointee = .haveData
-            return inputBuffer
-        } catch {
-            outStatus.pointee = .endOfStream
-            return nil
-        }
-    }
-
-    if let error { throw error }
-
-    guard let channelData = outputBuffer.floatChannelData else {
-        throw NSError(domain: "WhisperCppTestCLI", code: 3, userInfo: [NSLocalizedDescriptionKey: "No channel data"])
-    }
-
-    return Array(UnsafeBufferPointer(start: channelData[0], count: Int(outputBuffer.frameLength)))
+guard !mode.isEmpty else {
+    print(usage)
+    exit(1)
 }
 
-// MARK: - Test
-
 Task {
-    let totalStart = ContinuousClock.now
-
     do {
-        // 1. Load model
-        print("--- Lade Modell via WhisperCppBackend ---")
-        let loadStart = ContinuousClock.now
-        let backend = WhisperCppBackend(model: modelName)
-        try await backend.loadModel(for: .german) { progress in
-            print("  Progress: \(Int(progress * 100))%")
+        switch mode {
+        case "transcribe":
+            let modelName = CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : "tiny"
+            let audioPath = CommandLine.arguments.count > 3 ? CommandLine.arguments[3] : "TestAudio.m4a"
+            try await runTranscribeMode(modelName: modelName, audioPath: audioPath)
+
+        case "stream-file":
+            let args = parseStreamFileArgs()
+            try await runStreamFileMode(args: args)
+
+        case "sweep":
+            let args = parseSweepArgs()
+            try await runSweepMode(args: args)
+
+        default:
+            // Legacy: no mode keyword → treat args as (model, audio) for transcribe
+            let modelName = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "tiny"
+            let audioPath = CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : "TestAudio.m4a"
+            try await runTranscribeMode(modelName: modelName, audioPath: audioPath)
         }
-        let loadTime = ContinuousClock.now - loadStart
-        print("Modell geladen in \(loadTime)")
-
-        // 2. Load audio
-        print("\n--- Lade Audio ---")
-        let samples = try loadAudioSamples(from: audioPath)
-        let durationSeconds = Double(samples.count) / 16000.0
-        print("Audio: \(samples.count) samples (\(String(format: "%.1f", durationSeconds))s)")
-
-        // 3. Transcribe
-        print("\n--- Transkribiere ---")
-        let transcribeStart = ContinuousClock.now
-        let result = try await backend.transcribe(samples: samples, language: "de", prompt: "")
-        let transcribeTime = ContinuousClock.now - transcribeStart
-        print("Text: \(result.text)")
-        print("Transkription in \(transcribeTime)")
-        print("Segmente: \(result.segments.count)")
-
-        // 4. Summary
-        let totalTime = ContinuousClock.now - totalStart
-        print("\n=== Zusammenfassung ===")
-        print("Modell laden:    \(loadTime)")
-        print("Transkription:   \(transcribeTime)")
-        print("Gesamt:          \(totalTime)")
-        print("Audio-Dauer:     \(String(format: "%.1f", durationSeconds))s")
-        print("Realtime-Faktor: \(String(format: "%.2f", Double(transcribeTime.components.seconds) / durationSeconds))x")
-        print("\nPASS")
-
     } catch {
-        let elapsed = ContinuousClock.now - totalStart
-        print("\nFEHLER nach \(elapsed):")
+        print("\nFEHLER:")
         print("  Typ:  \(type(of: error))")
         print("  Desc: \(error)")
+        exit(1)
     }
 
     exit(0)

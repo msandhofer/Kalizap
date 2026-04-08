@@ -31,14 +31,11 @@ public final class WhisperCppBackend: WhisperBackend, @unchecked Sendable {
 
         FileLog.log("WhisperCppBackend.loadModel START — model=\(modelName)")
         do {
-            // Download Whisper model + VAD model in parallel
-            async let whisperDownload = withoutActuallyEscaping(onProgress) { escapingProgress in
+            // Download Whisper model + VAD model (sequential to avoid withoutActuallyEscaping + async let crash)
+            let modelURL = try await withoutActuallyEscaping(onProgress) { escapingProgress in
                 try await GGMLModelManager.shared.downloadModel(model, onProgress: escapingProgress)
             }
-            async let vadDownload = GGMLModelManager.shared.downloadVADModel { _ in }
-
-            let modelURL = try await whisperDownload
-            let vadURL = try await vadDownload
+            let vadURL = try await GGMLModelManager.shared.downloadVADModel { _ in }
             FileLog.log("  GGML model ready at \(modelURL.path)")
             FileLog.log("  VAD model ready at \(vadURL.path)")
 
