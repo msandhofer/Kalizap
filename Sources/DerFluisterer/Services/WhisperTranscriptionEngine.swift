@@ -16,7 +16,7 @@ public final class WhisperTranscriptionEngine: TranscriptionEngine, @unchecked S
 
     public func loadModel(
         for language: TranscriptionLanguage,
-        onProgress: @Sendable (Double) -> Void
+        onProgress: @escaping @Sendable (Double) -> Void
     ) async throws {
         try await backend.loadModel(for: language, onProgress: onProgress)
     }

@@ -13,7 +13,7 @@ public struct WhisperTranscriptionResult: Sendable {
 public protocol WhisperBackend: Sendable {
     func loadModel(
         for language: TranscriptionLanguage,
-        onProgress: @Sendable (Double) -> Void
+        onProgress: @escaping @Sendable (Double) -> Void
     ) async throws
 
     func transcribe(
@@ -37,7 +37,7 @@ public final class BatchTranscriber: @unchecked Sendable {
 
     public func loadModel(
         for language: TranscriptionLanguage,
-        onProgress: @Sendable (Double) -> Void
+        onProgress: @escaping @Sendable (Double) -> Void
     ) async throws {
         try await backend.loadModel(for: language, onProgress: onProgress)
         modelLoaded = true

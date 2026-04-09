@@ -419,6 +419,9 @@ public final class DictationPipeline {
         var insertionMs: Int = 0
         var usedStreamingResult: Bool = false
         var audioSampleCount: Int = 0
+        var stopSoundMs: Int = 0
+        var recorderStopMs: Int = 0
+        var streamingWaitMs: Int = 0
     }
 
     private func process(_ job: DictationJob) async {
@@ -431,6 +434,9 @@ public final class DictationPipeline {
         var timings = StageTimings()
         timings.audioSampleCount = job.buffer.samples.count
         timings.usedStreamingResult = !job.streamingResult.isEmpty
+        timings.stopSoundMs = job.stopSoundMs
+        timings.recorderStopMs = job.recorderStopMs
+        timings.streamingWaitMs = job.streamingWaitMs
 
         // 1. Transcribe
         let t1 = ContinuousClock.now
@@ -544,7 +550,10 @@ public final class DictationPipeline {
             usedStreamingResult: timings.usedStreamingResult,
             audioSampleCount: timings.audioSampleCount,
             whisperModel: deps.settings.audio.whisperModel.rawValue,
-            whisperEngine: deps.settings.audio.whisperEngine.rawValue
+            whisperEngine: deps.settings.audio.whisperEngine.rawValue,
+            stopSoundMs: timings.stopSoundMs,
+            recorderStopMs: timings.recorderStopMs,
+            streamingWaitMs: timings.streamingWaitMs
         )
         try? await deps.store.save(entry)
 

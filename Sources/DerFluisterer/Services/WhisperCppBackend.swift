@@ -25,7 +25,7 @@ public final class WhisperCppBackend: WhisperBackend, @unchecked Sendable {
 
     public func loadModel(
         for language: TranscriptionLanguage,
-        onProgress: @Sendable (Double) -> Void
+        onProgress: @escaping @Sendable (Double) -> Void
     ) async throws {
         guard let model = WhisperModel(rawValue: modelName) else {
             throw TranscriptionError.modelLoadFailed(reason: "Unknown model: \(modelName)")
@@ -33,17 +33,14 @@ public final class WhisperCppBackend: WhisperBackend, @unchecked Sendable {
 
         FileLog.log("WhisperCppBackend.loadModel START — model=\(modelName), coreml=\(useCoreML)")
         do {
-            // Download Whisper model + VAD model (sequential to avoid withoutActuallyEscaping + async let crash)
-            let modelURL = try await withoutActuallyEscaping(onProgress) { escapingProgress in
-                try await GGMLModelManager.shared.downloadModel(model, onProgress: escapingProgress)
-            }
+            let modelURL = try await GGMLModelManager.shared.downloadModel(model, onProgress: onProgress)
             let vadURL = try await GGMLModelManager.shared.downloadVADModel { _ in }
             FileLog.log("  GGML model ready at \(modelURL.path)")
             FileLog.log("  VAD model ready at \(vadURL.path)")
 
             // CoreML encoder: download if enabled, disable if not
             if useCoreML {
-                let coremlURL = try await GGMLModelManager.shared.downloadCoreMLEncoder(for: model) { _ in }
+                let coremlURL = try await GGMLModelManager.shared.downloadCoreMLEncoder(for: model, onProgress: onProgress)
                 try GGMLModelManager.shared.setCoreMLEncoderEnabled(true, for: model)
                 FileLog.log("  CoreML encoder ready at \(coremlURL.path)")
             } else {
@@ -88,14 +85,15 @@ public final class WhisperCppBackend: WhisperBackend, @unchecked Sendable {
         params.suppress_blank = true
         params.temperature_inc = 0
 
-        if !useCoreML {
+        if useCoreML {
+            // CoreML encoder is compiled for fixed 1500-frame input — must always use full size
+            params.audio_ctx = 1500
+        } else {
             // Optimize audio_ctx for Metal/CPU — smaller context = faster for short audio
             let melFrames = Int(ceil(Double(samples.count) / 16000.0 * 100.0))
             let aligned = ((melFrames + 63) / 64) * 64
             params.audio_ctx = Int32(max(768, min(aligned, 1500)))
         }
-        // CoreML: leave audio_ctx at 0 (default = full 1500 frames) — CoreML encoder
-        // is compiled for fixed input size and produces garbage with truncated input
 
         freeStringPointers()
         languagePointer = strdup(language)

@@ -22,6 +22,11 @@ public struct DictationEntry: Sendable, Equatable, Identifiable {
     public let whisperModel: String?
     public let whisperEngine: String?
 
+    // Overhead timing (time between user stop and processing start)
+    public let stopSoundMs: Int?
+    public let recorderStopMs: Int?
+    public let streamingWaitMs: Int?
+
     public var wordCount: Int {
         correctedText.split(separator: " ").count
     }
@@ -54,7 +59,10 @@ public struct DictationEntry: Sendable, Equatable, Identifiable {
         usedStreamingResult: Bool? = nil,
         audioSampleCount: Int? = nil,
         whisperModel: String? = nil,
-        whisperEngine: String? = nil
+        whisperEngine: String? = nil,
+        stopSoundMs: Int? = nil,
+        recorderStopMs: Int? = nil,
+        streamingWaitMs: Int? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -73,6 +81,9 @@ public struct DictationEntry: Sendable, Equatable, Identifiable {
         self.audioSampleCount = audioSampleCount
         self.whisperModel = whisperModel
         self.whisperEngine = whisperEngine
+        self.stopSoundMs = stopSoundMs
+        self.recorderStopMs = recorderStopMs
+        self.streamingWaitMs = streamingWaitMs
     }
 }
 
@@ -95,6 +106,9 @@ public final class DictationRecord {
     var audioSampleCount: Int?
     var whisperModel: String?
     var whisperEngine: String?
+    var stopSoundMs: Int?
+    var recorderStopMs: Int?
+    var streamingWaitMs: Int?
 
     init(
         id: UUID = UUID(),
@@ -113,7 +127,10 @@ public final class DictationRecord {
         usedStreamingResult: Bool? = nil,
         audioSampleCount: Int? = nil,
         whisperModel: String? = nil,
-        whisperEngine: String? = nil
+        whisperEngine: String? = nil,
+        stopSoundMs: Int? = nil,
+        recorderStopMs: Int? = nil,
+        streamingWaitMs: Int? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -132,6 +149,9 @@ public final class DictationRecord {
         self.audioSampleCount = audioSampleCount
         self.whisperModel = whisperModel
         self.whisperEngine = whisperEngine
+        self.stopSoundMs = stopSoundMs
+        self.recorderStopMs = recorderStopMs
+        self.streamingWaitMs = streamingWaitMs
     }
 
     var asEntry: DictationEntry {
@@ -152,7 +172,10 @@ public final class DictationRecord {
             usedStreamingResult: usedStreamingResult,
             audioSampleCount: audioSampleCount,
             whisperModel: whisperModel,
-            whisperEngine: whisperEngine
+            whisperEngine: whisperEngine,
+            stopSoundMs: stopSoundMs,
+            recorderStopMs: recorderStopMs,
+            streamingWaitMs: streamingWaitMs
         )
     }
 }

@@ -89,7 +89,7 @@ public protocol TranscriptionEngine: Sendable {
 
     func loadModel(
         for language: TranscriptionLanguage,
-        onProgress: @Sendable (Double) -> Void
+        onProgress: @escaping @Sendable (Double) -> Void
     ) async throws
 
     func cancel()

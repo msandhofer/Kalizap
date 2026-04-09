@@ -12,7 +12,7 @@ final class MockWhisperBackend: WhisperBackend, @unchecked Sendable {
     var resultText: String = "Hallo Welt"
     var shouldThrow = false
 
-    func loadModel(for language: TranscriptionLanguage, onProgress: @Sendable (Double) -> Void) async throws {
+    func loadModel(for language: TranscriptionLanguage, onProgress: @escaping @Sendable (Double) -> Void) async throws {
         loadedLanguage = language
         onProgress(0.5)
         onProgress(1.0)

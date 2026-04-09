@@ -14,7 +14,7 @@ public final class WhisperKitBackend: WhisperBackend, @unchecked Sendable {
 
     public func loadModel(
         for language: TranscriptionLanguage,
-        onProgress: @Sendable (Double) -> Void
+        onProgress: @escaping @Sendable (Double) -> Void
     ) async throws {
         FileLog.log("WhisperKitBackend.loadModel START — model=\(modelName)")
         FileLog.log("  Task.isCancelled=\(Task.isCancelled)")
