@@ -48,6 +48,83 @@ public struct StreamFileResult: Codable, Sendable {
     }
 }
 
+// MARK: - WhisperStream Types
+
+public struct WhisperStreamParams: Codable, Sendable {
+    public let fallbackInterval: Double
+    public let tailInterval: Double
+    public let partialAccept: Double
+
+    public init(fallbackInterval: Double, tailInterval: Double, partialAccept: Double) {
+        self.fallbackInterval = fallbackInterval
+        self.tailInterval = tailInterval
+        self.partialAccept = partialAccept
+    }
+}
+
+public struct WhisperStreamResult: Codable, Sendable {
+    public let file: String
+    public let engine: String
+    public let params: WhisperStreamParams
+    public let wer: Double?
+    public let streamWaitMs: Int
+    public let totalDecodeMs: Int
+    public let decodeCount: Int
+    public let deltaSeconds: Double
+    public let usedPartial: Bool
+    public let text: String
+    public let expected: String?
+
+    public init(
+        file: String, engine: String, params: WhisperStreamParams,
+        wer: Double?, streamWaitMs: Int, totalDecodeMs: Int,
+        decodeCount: Int, deltaSeconds: Double, usedPartial: Bool,
+        text: String, expected: String?
+    ) {
+        self.file = file
+        self.engine = engine
+        self.params = params
+        self.wer = wer
+        self.streamWaitMs = streamWaitMs
+        self.totalDecodeMs = totalDecodeMs
+        self.decodeCount = decodeCount
+        self.deltaSeconds = deltaSeconds
+        self.usedPartial = usedPartial
+        self.text = text
+        self.expected = expected
+    }
+}
+
+public struct WhisperSweepEntry: Codable, Sendable {
+    public let params: WhisperStreamParams
+    public let avgWER: Double
+    public let avgStreamWaitMs: Int
+    public let avgTotalDecodeMs: Int
+    public let fileCount: Int
+    public let paretoOptimal: Bool
+
+    public init(params: WhisperStreamParams, avgWER: Double, avgStreamWaitMs: Int, avgTotalDecodeMs: Int, fileCount: Int, paretoOptimal: Bool) {
+        self.params = params
+        self.avgWER = avgWER
+        self.avgStreamWaitMs = avgStreamWaitMs
+        self.avgTotalDecodeMs = avgTotalDecodeMs
+        self.fileCount = fileCount
+        self.paretoOptimal = paretoOptimal
+    }
+}
+
+public struct WhisperSweepResult: Codable, Sendable {
+    public let engine: String
+    public let entries: [WhisperSweepEntry]
+    public let details: [WhisperStreamResult]
+
+    public init(engine: String, entries: [WhisperSweepEntry], details: [WhisperStreamResult]) {
+        self.engine = engine
+        self.entries = entries
+        self.details = details
+    }
+}
+
 // MARK: - Sweep Result
 
 public struct SweepEntry: Codable, Sendable {
@@ -102,6 +179,33 @@ public enum ParetoFilter {
                 params: entry.params,
                 avgWER: entry.avgWER,
                 avgLatencyMs: entry.avgLatencyMs,
+                fileCount: entry.fileCount,
+                paretoOptimal: isPareto
+            )
+        }
+    }
+
+    public static func markWhisperPareto(
+        _ entries: [(params: WhisperStreamParams, avgWER: Double, avgStreamWaitMs: Int, avgTotalDecodeMs: Int, fileCount: Int)],
+        maxStreamWaitMs: Int = 500
+    ) -> [WhisperSweepEntry] {
+        let eligible = entries.filter { $0.avgStreamWaitMs < maxStreamWaitMs }
+
+        return entries.map { entry in
+            let isPareto: Bool
+            if entry.avgStreamWaitMs >= maxStreamWaitMs {
+                isPareto = false
+            } else {
+                isPareto = !eligible.contains { other in
+                    other.avgWER < entry.avgWER && other.avgStreamWaitMs < entry.avgStreamWaitMs
+                        && !(other.avgWER == entry.avgWER && other.avgStreamWaitMs == entry.avgStreamWaitMs)
+                }
+            }
+            return WhisperSweepEntry(
+                params: entry.params,
+                avgWER: entry.avgWER,
+                avgStreamWaitMs: entry.avgStreamWaitMs,
+                avgTotalDecodeMs: entry.avgTotalDecodeMs,
                 fileCount: entry.fileCount,
                 paretoOptimal: isPareto
             )
