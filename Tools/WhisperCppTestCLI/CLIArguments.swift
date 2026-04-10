@@ -28,6 +28,25 @@ struct SweepArgs {
     let coreml: Bool
 }
 
+struct StreamWhisperArgs {
+    let audioPath: String
+    let language: String?
+    let modelName: String
+    let fallbackInterval: Double
+    let tailInterval: Double
+    let partialAccept: Double
+    let json: Bool
+    let coreml: Bool
+}
+
+struct SweepWhisperArgs {
+    let directory: String
+    let language: String?
+    let modelName: String
+    let json: Bool
+    let coreml: Bool
+}
+
 func parseFlags(from startIndex: Int) -> [String: String] {
     var flags: [String: String] = [:]
     let args = CommandLine.arguments
@@ -129,6 +148,63 @@ func parseSweepArgs() -> SweepArgs {
         directory: dir,
         language: resolveLanguage(langArg),
         modelName: flags["model"] ?? "base",
+        json: flags["json"] != nil,
+        coreml: flags["coreml"] != nil
+    )
+}
+
+func parseStreamWhisperArgs() -> StreamWhisperArgs {
+    let args = CommandLine.arguments
+    let path = args.count > 2 ? args[2] : ""
+    guard !path.isEmpty else {
+        print("Fehler: Audio-Pfad erforderlich.")
+        print("Usage: swift run WhisperCppTestCLI stream-whisper <audio-path> [de|en|auto] [--model large-v3_turbo] [--fallback-interval 4.0] [--tail-interval 0] [--partial-accept 0] [--json] [--coreml]")
+        exit(1)
+    }
+
+    let langArg: String
+    if args.count > 3, !args[3].hasPrefix("--") {
+        langArg = args[3]
+    } else {
+        langArg = "de"
+    }
+    let flagStart = args.count > 3 && !args[3].hasPrefix("--") ? 4 : 3
+    let flags = parseFlags(from: flagStart)
+
+    return StreamWhisperArgs(
+        audioPath: path,
+        language: resolveLanguage(langArg),
+        modelName: flags["model"] ?? "large-v3_turbo",
+        fallbackInterval: Double(flags["fallback-interval"] ?? "") ?? 4.0,
+        tailInterval: Double(flags["tail-interval"] ?? "") ?? 0,
+        partialAccept: Double(flags["partial-accept"] ?? "") ?? 0,
+        json: flags["json"] != nil,
+        coreml: flags["coreml"] != nil
+    )
+}
+
+func parseSweepWhisperArgs() -> SweepWhisperArgs {
+    let args = CommandLine.arguments
+    let dir = args.count > 2 ? args[2] : ""
+    guard !dir.isEmpty else {
+        print("Fehler: Verzeichnis-Pfad erforderlich.")
+        print("Usage: swift run WhisperCppTestCLI sweep-whisper <directory> [de|en|auto] [--model large-v3_turbo] [--json] [--coreml]")
+        exit(1)
+    }
+
+    let langArg: String
+    if args.count > 3, !args[3].hasPrefix("--") {
+        langArg = args[3]
+    } else {
+        langArg = "de"
+    }
+    let flagStart = args.count > 3 && !args[3].hasPrefix("--") ? 4 : 3
+    let flags = parseFlags(from: flagStart)
+
+    return SweepWhisperArgs(
+        directory: dir,
+        language: resolveLanguage(langArg),
+        modelName: flags["model"] ?? "large-v3_turbo",
         json: flags["json"] != nil,
         coreml: flags["coreml"] != nil
     )

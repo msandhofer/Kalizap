@@ -8,6 +8,8 @@ Usage:
   swift run WhisperCppTestCLI batch <directory> [de|en|auto] [--model base] [--coreml]
   swift run WhisperCppTestCLI stream-file <audio-path> [de|en|auto] [--model base] [--min-segment 3] [--max-segment 7] [--min-silence 0.4] [--json] [--coreml]
   swift run WhisperCppTestCLI sweep <directory> [de|en|auto] [--model base] [--json] [--coreml]
+  swift run WhisperCppTestCLI stream-whisper <audio-path> [de|en|auto] [--model large-v3_turbo] [--fallback-interval 4.0] [--tail-interval 0] [--partial-accept 0] [--json] [--coreml]
+  swift run WhisperCppTestCLI sweep-whisper <directory> [de|en|auto] [--model large-v3_turbo] [--json] [--coreml]
 
 Models: tiny, base, small, large-v3, large-v3_turbo, large-v3_turbo-q5_0, german-turbo
 """
@@ -38,6 +40,14 @@ Task {
         case "sweep":
             let args = parseSweepArgs()
             try await runSweepMode(args: args)
+
+        case "stream-whisper":
+            let args = parseStreamWhisperArgs()
+            try await runStreamWhisperMode(args: args)
+
+        case "sweep-whisper":
+            let args = parseSweepWhisperArgs()
+            try await runSweepWhisperMode(args: args)
 
         default:
             // Legacy: no mode keyword → treat args as (model, audio) for transcribe
