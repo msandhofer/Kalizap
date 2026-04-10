@@ -1,0 +1,286 @@
+=== Insert Delay Test ===
+App:         terminal
+Delays:      0ms, 5ms, 10ms, 15ms, 20ms, 25ms, 50ms, 75ms, 100ms
+Reps:        10
+Texte:       short (4 chars), medium (107 chars), long (383 chars)
+
+  delay=0ms text=short XXXXXXXXXX 0/10
+  delay=0ms text=medium XXXXXXXXXX 0/10
+  delay=0ms text=long XXXXXXXXXX 0/10
+  delay=5ms text=short .X..X..X.X 6/10
+  delay=5ms text=medium X..X....XX 6/10
+  delay=5ms text=long ...X.....X 8/10
+  delay=10ms text=short ..X....... 9/10
+  delay=10ms text=medium .......... 10/10
+  delay=10ms text=long .........X 9/10
+  delay=15ms text=short .......... 10/10
+  delay=15ms text=medium .X........ 9/10
+  delay=15ms text=long .......... 10/10
+  delay=20ms text=short .......... 10/10
+  delay=20ms text=medium .......... 10/10
+  delay=20ms text=long .......... 10/10
+  delay=25ms text=short .......... 10/10
+  delay=25ms text=medium .......... 10/10
+  delay=25ms text=long .......... 10/10
+  delay=50ms text=short .......... 10/10
+  delay=50ms text=medium .......... 10/10
+  delay=50ms text=long .......... 10/10
+  delay=75ms text=short .......... 10/10
+  delay=75ms text=medium .......... 10/10
+  delay=75ms text=long .......... 10/10
+  delay=100ms text=short .......... 10/10
+  delay=100ms text=medium .......... 10/10
+  delay=100ms text=long .......... 10/10
+{
+  "app" : "terminal",
+  "recommendation" : {
+    "minSafeDelayMs" : 20,
+    "notes" : "100% Erfolg ab 20ms fuer alle Textlaengen"
+  },
+  "results" : [
+    {
+      "app" : "terminal",
+      "delayMs" : 0,
+      "runs" : 10,
+      "successRate" : 0,
+      "successes" : 0,
+      "textChars" : 4,
+      "textLength" : "short"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 0,
+      "runs" : 10,
+      "successRate" : 0,
+      "successes" : 0,
+      "textChars" : 107,
+      "textLength" : "medium"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 0,
+      "runs" : 10,
+      "successRate" : 0,
+      "successes" : 0,
+      "textChars" : 383,
+      "textLength" : "long"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 5,
+      "runs" : 10,
+      "successRate" : 0.6,
+      "successes" : 6,
+      "textChars" : 4,
+      "textLength" : "short"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 5,
+      "runs" : 10,
+      "successRate" : 0.6,
+      "successes" : 6,
+      "textChars" : 107,
+      "textLength" : "medium"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 5,
+      "runs" : 10,
+      "successRate" : 0.8,
+      "successes" : 8,
+      "textChars" : 383,
+      "textLength" : "long"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 10,
+      "runs" : 10,
+      "successRate" : 0.9,
+      "successes" : 9,
+      "textChars" : 4,
+      "textLength" : "short"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 10,
+      "runs" : 10,
+      "successRate" : 1,
+      "successes" : 10,
+      "textChars" : 107,
+      "textLength" : "medium"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 10,
+      "runs" : 10,
+      "successRate" : 0.9,
+      "successes" : 9,
+      "textChars" : 383,
+      "textLength" : "long"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 15,
+      "runs" : 10,
+      "successRate" : 1,
+      "successes" : 10,
+      "textChars" : 4,
+      "textLength" : "short"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 15,
+      "runs" : 10,
+      "successRate" : 0.9,
+      "successes" : 9,
+      "textChars" : 107,
+      "textLength" : "medium"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 15,
+      "runs" : 10,
+      "successRate" : 1,
+      "successes" : 10,
+      "textChars" : 383,
+      "textLength" : "long"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 20,
+      "runs" : 10,
+      "successRate" : 1,
+      "successes" : 10,
+      "textChars" : 4,
+      "textLength" : "short"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 20,
+      "runs" : 10,
+      "successRate" : 1,
+      "successes" : 10,
+      "textChars" : 107,
+      "textLength" : "medium"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 20,
+      "runs" : 10,
+      "successRate" : 1,
+      "successes" : 10,
+      "textChars" : 383,
+      "textLength" : "long"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 25,
+      "runs" : 10,
+      "successRate" : 1,
+      "successes" : 10,
+      "textChars" : 4,
+      "textLength" : "short"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 25,
+      "runs" : 10,
+      "successRate" : 1,
+      "successes" : 10,
+      "textChars" : 107,
+      "textLength" : "medium"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 25,
+      "runs" : 10,
+      "successRate" : 1,
+      "successes" : 10,
+      "textChars" : 383,
+      "textLength" : "long"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 50,
+      "runs" : 10,
+      "successRate" : 1,
+      "successes" : 10,
+      "textChars" : 4,
+      "textLength" : "short"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 50,
+      "runs" : 10,
+      "successRate" : 1,
+      "successes" : 10,
+      "textChars" : 107,
+      "textLength" : "medium"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 50,
+      "runs" : 10,
+      "successRate" : 1,
+      "successes" : 10,
+      "textChars" : 383,
+      "textLength" : "long"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 75,
+      "runs" : 10,
+      "successRate" : 1,
+      "successes" : 10,
+      "textChars" : 4,
+      "textLength" : "short"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 75,
+      "runs" : 10,
+      "successRate" : 1,
+      "successes" : 10,
+      "textChars" : 107,
+      "textLength" : "medium"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 75,
+      "runs" : 10,
+      "successRate" : 1,
+      "successes" : 10,
+      "textChars" : 383,
+      "textLength" : "long"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 100,
+      "runs" : 10,
+      "successRate" : 1,
+      "successes" : 10,
+      "textChars" : 4,
+      "textLength" : "short"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 100,
+      "runs" : 10,
+      "successRate" : 1,
+      "successes" : 10,
+      "textChars" : 107,
+      "textLength" : "medium"
+    },
+    {
+      "app" : "terminal",
+      "delayMs" : 100,
+      "runs" : 10,
+      "successRate" : 1,
+      "successes" : 10,
+      "textChars" : 383,
+      "textLength" : "long"
+    }
+  ],
+  "timestamp" : "2026-04-10T06:47:36Z"
+}

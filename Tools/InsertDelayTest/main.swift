@@ -59,8 +59,10 @@ let results: [DelayTestResult]
 switch appName {
 case "textedit":
     results = runTextEditTests(delays: delays, texts: testTexts, repetitions: repetitions)
+case "terminal":
+    results = runTerminalTests(delays: delays, texts: testTexts, repetitions: repetitions)
 default:
-    print("App '\(appName)' noch nicht unterstuetzt. Verwende 'textedit'.")
+    print("App '\(appName)' noch nicht unterstuetzt. Verwende 'textedit' oder 'terminal'.")
     exit(1)
 }
 

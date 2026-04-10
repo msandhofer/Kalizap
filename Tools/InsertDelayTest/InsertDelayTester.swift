@@ -152,6 +152,124 @@ func runTextEditTests(
     return results
 }
 
+// MARK: - Terminal Helpers
+
+func simulateKeystroke(virtualKey: CGKeyCode, control: Bool = false) {
+    let source = CGEventSource(stateID: .hidSystemState)
+    guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: virtualKey, keyDown: true),
+          let keyUp = CGEvent(keyboardEventSource: source, virtualKey: virtualKey, keyDown: false)
+    else { return }
+    if control {
+        keyDown.flags = .maskControl
+        keyUp.flags = .maskControl
+    }
+    keyDown.post(tap: .cghidEventTap)
+    keyUp.post(tap: .cghidEventTap)
+}
+
+enum TerminalScript {
+    static func activate() {
+        runAppleScript("""
+            tell application "Terminal"
+                activate
+            end tell
+        """)
+    }
+
+    static func readContent() -> String {
+        runAppleScript("""
+            tell application "Terminal"
+                get contents of selected tab of front window
+            end tell
+        """) ?? ""
+    }
+
+    static func clearLine() {
+        // Ctrl+U: kill whole line
+        simulateKeystroke(virtualKey: 0x20, control: true)
+    }
+}
+
+// MARK: - Terminal Test Runner
+
+func runTerminalTests(
+    delays: [Int],
+    texts: [(name: String, text: String)],
+    repetitions: Int
+) -> [DelayTestResult] {
+    var results: [DelayTestResult] = []
+
+    TerminalScript.activate()
+    Thread.sleep(forTimeInterval: 0.5)
+
+    for delay in delays {
+        for (name, text) in texts {
+            var successes = 0
+            print("  delay=\(delay)ms text=\(name) ", terminator: "")
+            fflush(stdout)
+
+            for _ in 0..<repetitions {
+                // Clear current line
+                TerminalScript.clearLine()
+                Thread.sleep(forTimeInterval: 0.1)
+
+                // Snapshot terminal content before paste
+                let contentBefore = TerminalScript.readContent()
+
+                setClipboard(text)
+                Thread.sleep(forTimeInterval: 0.03)
+                simulatePaste()
+
+                Thread.sleep(forTimeInterval: Double(delay) / 1000.0)
+
+                // Simulate restore: overwrite clipboard
+                setClipboard("__RESTORED__")
+
+                // Wait for Terminal to process paste
+                Thread.sleep(forTimeInterval: 0.25)
+
+                // Read terminal content and check for pasted text
+                let contentAfter = TerminalScript.readContent()
+                let newContent = String(contentAfter.dropFirst(min(contentBefore.count, contentAfter.count)))
+                let expected = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                // Check if the expected text appears in the new terminal content
+                let found = newContent.contains(expected) || contentAfter.hasSuffix(expected)
+                    || contentAfter.contains(expected + "\n")
+                    || contentAfter.range(of: expected, options: .backwards) != nil
+                    && !contentBefore.contains(expected)
+
+                if found {
+                    successes += 1
+                    print(".", terminator: "")
+                } else {
+                    print("X", terminator: "")
+                }
+                fflush(stdout)
+
+                // Clean up: Ctrl+U to clear pasted text from prompt
+                TerminalScript.clearLine()
+                Thread.sleep(forTimeInterval: 0.05)
+            }
+
+            let rate = Double(successes) / Double(repetitions)
+            print(" \(successes)/\(repetitions)")
+
+            results.append(DelayTestResult(
+                app: "terminal",
+                textLength: name,
+                textChars: text.count,
+                delayMs: delay,
+                runs: repetitions,
+                successes: successes,
+                successRate: rate
+            ))
+        }
+    }
+
+    return results
+}
+
 // MARK: - Report
 
 func buildReport(app: String, results: [DelayTestResult], delays: [Int]) -> DelayTestReport {
