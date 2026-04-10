@@ -102,6 +102,11 @@ let package = Package(
             dependencies: [],
             path: "Tools/ToastTestCLI"
         ),
+        .executableTarget(
+            name: "InsertDelayTest",
+            dependencies: ["DerFluisterer"],
+            path: "Tools/InsertDelayTest"
+        ),
         .target(
             name: "STTTestCommon",
             path: "Tools/STTTestCommon"
