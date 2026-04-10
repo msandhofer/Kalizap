@@ -107,6 +107,12 @@ let package = Package(
             dependencies: ["DerFluisterer"],
             path: "Tools/InsertDelayTest"
         ),
+        .executableTarget(
+            name: "InsertDelayScreenshotTest",
+            dependencies: ["DerFluisterer"],
+            path: "Tools/InsertDelayScreenshotTest",
+            exclude: ["screenshots"]
+        ),
         .target(
             name: "STTTestCommon",
             path: "Tools/STTTestCommon"
