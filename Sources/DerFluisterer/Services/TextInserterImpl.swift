@@ -12,7 +12,7 @@ public final class TextInserterImpl: TextInserting, @unchecked Sendable {
         keystroke: any KeystrokeSimulating,
         accessibility: any AccessibilityInserting,
         appDetector: any ActiveAppDetecting,
-        restoreDelay: Duration = .milliseconds(500)
+        restoreDelay: Duration = .milliseconds(100)
     ) {
         self.clipboard = clipboard
         self.keystroke = keystroke
