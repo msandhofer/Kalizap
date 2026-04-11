@@ -1,0 +1,62 @@
+Per-File Analyse: Letzte 3 Woerter und StreamWait
+==============================================================================================================
+
+TestAudio.m4a:
+  Baseline (fb=4.0)         SW= 867ms   delta=3.06s | ...Transkription zu testen.
+  fb=4.0 t=1.0 p=0.3        SW=   0ms P delta=3.06s | ...Transkription zu testen.
+  fb=4.0 t=1.0 p=0.5        SW=   0ms P delta=3.06s | ...Transkription zu testen.
+  fb=4.0 t=1.0 p=1.0        SW=   0ms P delta=3.06s | ...Transkription zu testen.
+
+Testaufnahme1.m4a:
+  Baseline (fb=4.0)         SW= 859ms   delta=2.93s | ...das Pferd erzähle.
+  fb=4.0 t=1.0 p=0.3        SW=   0ms P delta=2.93s | ...das Pferd erzähle.
+  fb=4.0 t=1.0 p=0.5        SW=   0ms P delta=2.93s | ...das Pferd erzähle.
+  fb=4.0 t=1.0 p=1.0        SW=   0ms P delta=2.93s | ...das Pferd erzähle.
+
+Testaufnahme10.m4a:
+  Baseline (fb=4.0)         SW= 997ms   delta=3.45s | ...das vorgesehen habe.
+  fb=4.0 t=1.0 p=0.3        SW=1002ms   delta=3.45s | ...das vorgesehen habe.
+  fb=4.0 t=1.0 p=0.5        SW=   0ms P delta=3.45s | ...das vorgesehen habe.
+  fb=4.0 t=1.0 p=1.0        SW=   0ms P delta=3.45s | ...das vorgesehen habe.
+
+Testaufnahme2.m4a:
+  Baseline (fb=4.0)         SW= 887ms   delta=0.96s | ...wie Sockenkompott. Und
+  fb=4.0 t=1.0 p=0.3        SW=   0ms P delta=0.96s | ...wie Sockenkompott. Und
+  fb=4.0 t=1.0 p=0.5        SW=   0ms P delta=0.96s | ...wie Sockenkompott. Und
+  fb=4.0 t=1.0 p=1.0        SW=   0ms P delta=0.96s | ...wie Sockenkompott. Und
+
+Testaufnahme4.m4a:
+  Baseline (fb=4.0)         SW= 792ms   delta=0.36s | ...Gut. -
+  fb=4.0 t=1.0 p=0.3        SW= 748ms   delta=0.36s | ...Gut. -
+  fb=4.0 t=1.0 p=0.5        SW=   0ms P delta=0.36s | ...Gut.
+  fb=4.0 t=1.0 p=1.0        SW=   0ms P delta=0.36s | ...Gut.
+
+Testaufnahme5.m4a:
+  Baseline (fb=4.0)         SW=   0ms P delta=0.08s | ...bekanntlich weltumspannende Abenteuerbegriffe.
+  fb=4.0 t=1.0 p=0.3        SW=   0ms P delta=0.08s | ...bekanntlich weltumspannende Abenteuerbegriffe.
+  fb=4.0 t=1.0 p=0.5        SW=   0ms P delta=0.08s | ...bekanntlich weltumspannende Abenteuerbegriffe.
+  fb=4.0 t=1.0 p=1.0        SW=   0ms P delta=0.08s | ...bekanntlich weltumspannende Abenteuerbegriffe.
+
+Testaufnahme6.m4a:
+  Baseline (fb=4.0)         SW= 873ms   delta=3.65s | ...die Aufgabe benötigt.
+  fb=4.0 t=1.0 p=0.3        SW= 791ms   delta=3.65s | ...die Aufgabe benötigt.
+  fb=4.0 t=1.0 p=0.5        SW= 862ms   delta=3.65s | ...die Aufgabe benötigt.
+  fb=4.0 t=1.0 p=1.0        SW=   0ms P delta=3.65s | ...die Aufgabe benötigt.
+
+Testaufnahme7.m4a:
+  Baseline (fb=4.0)         SW=1034ms   delta=0.74s | ...in License. Punkt.
+  fb=4.0 t=1.0 p=0.3        SW= 984ms   delta=0.74s | ...in License. Punkt.
+  fb=4.0 t=1.0 p=0.5        SW= 838ms   delta=0.74s | ...in License. Punkt.
+  fb=4.0 t=1.0 p=1.0        SW=   0ms P delta=0.74s | ...Bedingungen in License.
+
+Testaufnahme8.m4a:
+  Baseline (fb=4.0)         SW=   0ms P delta=0.00s | ...für mich sein.
+  fb=4.0 t=1.0 p=0.3        SW=   0ms P delta=0.00s | ...für mich sein.
+  fb=4.0 t=1.0 p=0.5        SW=   0ms P delta=0.00s | ...für mich sein.
+  fb=4.0 t=1.0 p=1.0        SW=   0ms P delta=0.00s | ...für mich sein.
+
+Testaufnahme9.m4a:
+  Baseline (fb=4.0)         SW= 820ms   delta=1.84s | ...Saft tut gut.
+  fb=4.0 t=1.0 p=0.3        SW=   0ms P delta=1.84s | ...Saft tut gut.
+  fb=4.0 t=1.0 p=0.5        SW=   0ms P delta=1.84s | ...Saft tut gut.
+  fb=4.0 t=1.0 p=1.0        SW=   0ms P delta=1.84s | ...Saft tut gut.
