@@ -191,19 +191,39 @@ dass normale Aufnahmen (>8s) identische WER haben unabhaengig von PA.
    Max-Frequenz). Die absoluten Decode-Zeiten im Sweep sind pessimistisch.
    Relative Verhaeltnisse bleiben valide.
 
-### Entscheidung
+### Entscheidung: Verworfen
 
-**fb=4.0 (beibehalten), Tail=1.0s, PA=0.3s**
+Die Sweep-Ergebnisse zeigten vielversprechende StreamWait-Reduktionen in der
+Simulation (bis zu 0ms). **Die Implementierung in der echten App zeigte jedoch
+keinen messbaren Nutzen** (StreamWait blieb bei ~1000-1500ms).
 
-Konservativer Ansatz: Hauptgewinn durch Tail-Cache, minimales Risiko durch
-niedrigen PA-Schwellwert (0.3s ≈ 1 Silbe).
+### Ursache: Simulationsfehler
 
-Erwartete Einsparung: StreamWait ~700ms → ~350ms (Halbierung).
-Bei guenstigem Timing: 0ms. Bei unguenstigem: ~800ms (wie bisher).
+Die Simulation modellierte die Nebenlaefigkeit nicht korrekt:
 
-**Einsparung: ~350ms (Durchschnitt)**
+- **Simulation:** Decodes passieren "zwischen" Ticks ohne simulierte Zeit zu
+  verbrauchen. Beim "Stop" ist kein Decode im Gange. StreamWait = nur der
+  finale Delta-Decode (der durch Tail-Cache/PA wegfaellt).
+
+- **Reale App:** Decodes dauern ~800ms Echtzeit. Waehrend eines Decodes kommt
+  neues Audio vom Mikrofon. Beim Stop ist mit ~60% Wahrscheinlichkeit ein
+  Decode im Gange. StreamWait = Restzeit des laufenden Decodes + ggf.
+  Delta-Decode. Der Tail-Cache/PA eliminiert nur den Delta-Decode, aber der
+  laufende Decode (~800ms) dominiert die Wartezeit.
+
+Verifiziert durch verbose-log Analyse: In 11 Diktaten lief in JEDEM Fall ein
+Decode waehrend des StreamWait. Tail-Cache-Accept und Partial-Accept griffen
+korrekt (2 von 11 Faellen), aber erst NACHDEM der laufende Decode fertig war.
+
+**Learning:** Simulationen muessen gegen das reale System verifiziert werden,
+bevor Ergebnisse abgeleitet werden. Ein einzelner Vergleich (Simulation vs.
+App-Log) haette den Fehler sofort aufgedeckt.
 
 ### Rohdaten
+
+Die Sweep-Daten bleiben als Referenz erhalten. Die WER-Vergleiche sind weiterhin
+valide (Textqualitaet ist korrekt gemessen). Nur die StreamWait-Werte der
+Simulation sind nicht auf die reale App uebertragbar.
 
 - `rohdaten/streamwait-sweep-clean.json` — Alle 400 Einzelergebnisse (bereinigtes JSON)
 - `rohdaten/streamwait-sweep.json` — Original-Sweep-Output (inkl. Fortschrittsausgabe)
@@ -216,12 +236,17 @@ Bei guenstigem Timing: 0ms. Bei unguenstigem: ~800ms (wie bisher).
 | Phase | Vorher | Nachher | Einsparung |
 |-------|--------|---------|------------|
 | Insert (restoreDelay) | 540ms | 140ms | **400ms** |
-| StreamWait (Tail+PA) | 700ms | 350ms | **350ms** |
-| **Summe** | | | **~750ms** |
+| StreamWait (Tail+PA) | — | — | **0ms (verworfen)** |
+| **Summe** | | | **~400ms** |
 
-Gesamt-Latenz: ~2800ms → ~2050ms. Noch nicht am Ziel (<1000ms), aber ein
-grosser Schritt. Die verbleibende Luecke liegt bei STT (~870ms, bereits
-optimiert) und LLM (~840ms, spaeter).
+Gesamt-Latenz: ~2800ms → ~2400ms. Das Ziel (<1000ms) ist mit den verbleibenden
+Phasen (STT ~870ms, LLM ~840ms) ohne grundlegende Architektur-Aenderungen
+nicht erreichbar. Die Insert-Optimierung ist der einzige reale Gewinn.
+
+Der dominierende Flaschenhals (StreamWait ~1000ms) ist inhaerent: Whisper-Decodes
+auf CoreML/M1 dauern ~800ms pro Aufruf, und beim Stop muss der laufende Decode
+abgewartet werden. Eine Reduktion wuerde schnellere Hardware, ein kleineres
+Modell oder eine fundamental andere Streaming-Architektur erfordern.
 
 ---
 
@@ -232,5 +257,5 @@ eingebunden:
 
 - **InsertDelayTest**: Automatisierter Clipboard-Paste-Delay-Test fuer TextEdit/Terminal
 - **InsertDelayScreenshotTest**: Screenshot-basierter Paste-Test fuer Apps ohne AppleScript
-- **WhisperCppTestCLI stream-whisper**: Deterministische Streaming-Simulation
+- **WhisperCppTestCLI stream-whisper**: Deterministische Streaming-Simulation (WER-Vergleich valide, StreamWait-Werte nicht realistisch)
 - **WhisperCppTestCLI sweep-whisper**: Parameter-Grid mit Pareto-Analyse

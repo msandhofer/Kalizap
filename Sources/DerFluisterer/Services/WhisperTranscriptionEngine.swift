@@ -9,8 +9,6 @@ public final class WhisperTranscriptionEngine: TranscriptionEngine, @unchecked S
     private static let minSamplesForDecode = 16000 // 1s at 16kHz
     private static let maxSilenceCheckInterval: Duration = .milliseconds(200)
     private static let fallbackDecodeInterval: Duration = .seconds(4)
-    private static let tailDecodeInterval: Duration = .seconds(1)
-    private static let partialAcceptSamples = 4800 // 0.3s at 16kHz
 
     public init(backend: WhisperBackend) {
         self.backend = backend
@@ -54,11 +52,6 @@ public final class WhisperTranscriptionEngine: TranscriptionEngine, @unchecked S
                 var lastDecodeTime = ContinuousClock.now
                 var lastKnownBoundaryCount = 0
 
-                // Tail-Decode cache (Ansatz C: speculative decode after last VAD boundary)
-                var cachedTailText = ""
-                var cachedTailSampleCount = 0
-                var lastTailDecodeTime = ContinuousClock.now
-
                 while !Task.isCancelled {
                     try? await Task.sleep(for: Self.maxSilenceCheckInterval)
                     guard !Task.isCancelled else { break }
@@ -76,78 +69,45 @@ public final class WhisperTranscriptionEngine: TranscriptionEngine, @unchecked S
                     let fallbackNeeded = timeSinceLastDecode >= Self.fallbackDecodeInterval
                         && sampleCount > lastDecodedSampleCount + Self.minSamplesForDecode
 
-                    // Check if tail decode is needed (even without VAD/fallback)
-                    let tailTimeSinceLastDecode = ContinuousClock.now - lastTailDecodeTime
-                    let tailNeeded = lastDecodedSampleCount > 0
-                        && tailTimeSinceLastDecode >= Self.tailDecodeInterval
-                        && sampleCount > lastDecodedSampleCount + 1600
+                    guard hasNewBoundary || fallbackNeeded else { continue }
 
-                    guard hasNewBoundary || fallbackNeeded || tailNeeded else { continue }
+                    // Determine how many samples to transcribe
+                    let samplesToDecodeCount: Int
+                    if hasNewBoundary, let lastBoundary = boundaries.last {
+                        samplesToDecodeCount = min(Int(lastBoundary * 16000), sampleCount)
+                        lastKnownBoundaryCount = boundaries.count
+                    } else {
+                        samplesToDecodeCount = sampleCount
+                    }
 
-                    if hasNewBoundary || fallbackNeeded {
-                        // VAD/Fallback decode
-                        let samplesToDecodeCount: Int
-                        if hasNewBoundary, let lastBoundary = boundaries.last {
-                            samplesToDecodeCount = min(Int(lastBoundary * 16000), sampleCount)
-                            lastKnownBoundaryCount = boundaries.count
-                        } else {
-                            samplesToDecodeCount = sampleCount
-                        }
+                    guard samplesToDecodeCount > lastDecodedSampleCount else { continue }
 
-                        guard samplesToDecodeCount > lastDecodedSampleCount else { continue }
+                    // Re-decode up to the silence boundary
+                    var samplesToTranscribe = Array(samples.prefix(samplesToDecodeCount))
+                    AudioProcessingUtils.peakNormalize(&samplesToTranscribe)
 
-                        var samplesToTranscribe = Array(samples.prefix(samplesToDecodeCount))
-                        AudioProcessingUtils.peakNormalize(&samplesToTranscribe)
+                    let decodeStart = ContinuousClock.now
+                    do {
+                        let result = try await backend.transcribe(
+                            samples: samplesToTranscribe,
+                            language: config.language.rawValue,
+                            prompt: config.initialPrompt
+                        )
+                        guard !Task.isCancelled else { break }
 
-                        let decodeStart = ContinuousClock.now
-                        do {
-                            let result = try await backend.transcribe(
-                                samples: samplesToTranscribe,
-                                language: config.language.rawValue,
-                                prompt: config.initialPrompt
-                            )
-                            guard !Task.isCancelled else { break }
+                        accumulatedText = result.text
+                        lastDecodedSampleCount = samplesToDecodeCount
+                        lastDecodeTime = ContinuousClock.now
 
-                            accumulatedText = result.text
-                            lastDecodedSampleCount = samplesToDecodeCount
-                            lastDecodeTime = ContinuousClock.now
+                        let decodeDuration = ContinuousClock.now - decodeStart
+                        FileLog.log("VAD re-decode: \(samplesToDecodeCount) samples in \(decodeDuration), boundaries=\(boundaries.count), text=\(result.text.prefix(50))")
 
-                            let decodeDuration = ContinuousClock.now - decodeStart
-                            FileLog.log("VAD re-decode: \(samplesToDecodeCount) samples in \(decodeDuration), boundaries=\(boundaries.count), text=\(result.text.prefix(50))")
-
-                            continuation.yield(.partial(PartialTranscription(
-                                text: accumulatedText,
-                                confidence: 0
-                            )))
-
-                            // Reset tail cache after VAD/fallback decode
-                            cachedTailText = ""
-                            cachedTailSampleCount = 0
-                            lastTailDecodeTime = ContinuousClock.now
-                        } catch {
-                            FileLog.log("VAD re-decode error: \(error)")
-                        }
-                    } else if tailNeeded {
-                        // Speculative tail decode: decode audio after last VAD boundary
-                        let tailSamples = Array(samples[lastDecodedSampleCount..<sampleCount])
-                        var normalizedTail = tailSamples
-                        AudioProcessingUtils.peakNormalize(&normalizedTail)
-
-                        do {
-                            let tailResult = try await backend.transcribe(
-                                samples: normalizedTail,
-                                language: config.language.rawValue,
-                                prompt: accumulatedText
-                            )
-                            guard !Task.isCancelled else { break }
-
-                            cachedTailText = tailResult.text
-                            cachedTailSampleCount = sampleCount
-                            lastTailDecodeTime = ContinuousClock.now
-                            FileLog.log("Tail decode: \(tailSamples.count) samples, tail=\(tailResult.text.prefix(50))")
-                        } catch {
-                            FileLog.log("Tail decode error: \(error)")
-                        }
+                        continuation.yield(.partial(PartialTranscription(
+                            text: accumulatedText,
+                            confidence: 0
+                        )))
+                    } catch {
+                        FileLog.log("VAD re-decode error: \(error)")
                     }
                 }
 
@@ -165,30 +125,11 @@ public final class WhisperTranscriptionEngine: TranscriptionEngine, @unchecked S
                 if lastDecodedSampleCount > 0, lastDecodedSampleCount < allSamples.count {
                     let deltaSamples = Array(allSamples.suffix(from: lastDecodedSampleCount))
 
-                    // Partial-Accept: skip delta decode if remaining audio is very short
-                    if deltaSamples.count < Self.partialAcceptSamples {
-                        let finalText: String
-                        if !cachedTailText.isEmpty {
-                            finalText = (accumulatedText + " " + cachedTailText).trimmingCharacters(in: .whitespaces)
-                            FileLog.log("TranscriptionEngine — partial-accept with tail cache (\(deltaSamples.count) samples < \(Self.partialAcceptSamples))")
-                        } else {
-                            finalText = accumulatedText
-                            FileLog.log("TranscriptionEngine — partial-accept (\(deltaSamples.count) samples < \(Self.partialAcceptSamples)), using accumulated text")
-                        }
+                    if deltaSamples.count < 1600 {
+                        // <0.1s remaining — use accumulated text as final
+                        FileLog.log("TranscriptionEngine — delta too small (\(deltaSamples.count) samples), using accumulated text")
                         continuation.yield(.final(FinalTranscription(
-                            text: finalText,
-                            segments: [],
-                            processingTime: .zero,
-                            normalizationTime: .zero
-                        )))
-                    } else if !cachedTailText.isEmpty
-                        && (allSamples.count - cachedTailSampleCount) < Self.partialAcceptSamples
-                    {
-                        // Tail cache is recent enough — use it instead of delta decode
-                        let finalText = (accumulatedText + " " + cachedTailText).trimmingCharacters(in: .whitespaces)
-                        FileLog.log("TranscriptionEngine — tail-cache accept (\(allSamples.count - cachedTailSampleCount) new samples since cache)")
-                        continuation.yield(.final(FinalTranscription(
-                            text: finalText,
+                            text: accumulatedText,
                             segments: [],
                             processingTime: .zero,
                             normalizationTime: .zero
