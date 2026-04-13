@@ -213,6 +213,68 @@ public enum ParetoFilter {
     }
 }
 
+// MARK: - SpeechAnalyzer Result Types
+
+public struct SpeechAnalyzerResult: Codable, Sendable {
+    public let file: String
+    public let locale: String
+    public let wer: Double?
+    public let transcribeMs: Int
+    public let audioDurationSeconds: Double
+    public let rtf: Double
+    public let text: String
+    public let expected: String?
+
+    public init(file: String, locale: String, wer: Double?, transcribeMs: Int, audioDurationSeconds: Double, rtf: Double, text: String, expected: String?) {
+        self.file = file
+        self.locale = locale
+        self.wer = wer
+        self.transcribeMs = transcribeMs
+        self.audioDurationSeconds = audioDurationSeconds
+        self.rtf = rtf
+        self.text = text
+        self.expected = expected
+    }
+}
+
+public struct SpeechAnalyzerBatchResult: Codable, Sendable {
+    public let engine: String
+    public let locale: String
+    public let results: [SpeechAnalyzerResult]
+
+    public init(engine: String, locale: String, results: [SpeechAnalyzerResult]) {
+        self.engine = engine
+        self.locale = locale
+        self.results = results
+    }
+}
+
+public struct SpeechAnalyzerStreamResult: Codable, Sendable {
+    public let file: String
+    public let locale: String
+    public let wer: Double?
+    public let firstResultMs: Int
+    public let streamLatencyMs: Int
+    public let volatileCount: Int
+    public let audioDurationSeconds: Double
+    public let totalMs: Int
+    public let text: String
+    public let expected: String?
+
+    public init(file: String, locale: String, wer: Double?, firstResultMs: Int, streamLatencyMs: Int, volatileCount: Int, audioDurationSeconds: Double, totalMs: Int, text: String, expected: String?) {
+        self.file = file
+        self.locale = locale
+        self.wer = wer
+        self.firstResultMs = firstResultMs
+        self.streamLatencyMs = streamLatencyMs
+        self.volatileCount = volatileCount
+        self.audioDurationSeconds = audioDurationSeconds
+        self.totalMs = totalMs
+        self.text = text
+        self.expected = expected
+    }
+}
+
 // MARK: - JSON Encoding Helper
 
 public enum TestResultJSON {

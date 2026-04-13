@@ -127,6 +127,22 @@ let package = Package(
             path: "Tools/WhisperCppTestCLI"
         ),
         .executableTarget(
+            name: "SpeechAnalyzerTestCLI",
+            dependencies: [
+                "STTTestCommon",
+            ],
+            path: "Tools/SpeechAnalyzerTestCLI",
+            exclude: ["Info.plist"],
+            linkerSettings: [
+                .unsafeFlags([
+                    "-Xlinker", "-sectcreate",
+                    "-Xlinker", "__TEXT",
+                    "-Xlinker", "__info_plist",
+                    "-Xlinker", "Tools/SpeechAnalyzerTestCLI/Info.plist",
+                ]),
+            ]
+        ),
+        .executableTarget(
             name: "SpeechSwiftTestCLI",
             dependencies: [
                 "STTTestCommon",
