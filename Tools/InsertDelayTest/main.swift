@@ -61,8 +61,12 @@ case "textedit":
     results = runTextEditTests(delays: delays, texts: testTexts, repetitions: repetitions)
 case "terminal":
     results = runTerminalTests(delays: delays, texts: testTexts, repetitions: repetitions)
+case "iterm", "iterm2":
+    results = runITermTests(delays: delays, texts: testTexts, repetitions: repetitions)
+case "ghostty":
+    results = runGhosttyTests(delays: delays, texts: testTexts, repetitions: repetitions)
 default:
-    print("App '\(appName)' noch nicht unterstuetzt. Verwende 'textedit' oder 'terminal'.")
+    print("App '\(appName)' nicht unterstuetzt. Verwende: textedit, terminal, iterm, ghostty.")
     exit(1)
 }
 

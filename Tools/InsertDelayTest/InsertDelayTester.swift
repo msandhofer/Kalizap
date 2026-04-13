@@ -167,40 +167,91 @@ func simulateKeystroke(virtualKey: CGKeyCode, control: Bool = false) {
     keyUp.post(tap: .cghidEventTap)
 }
 
-enum TerminalScript {
-    static func activate() {
-        runAppleScript("""
+// MARK: - Generic Terminal App Config
+
+struct TerminalAppConfig {
+    let name: String
+    let activateScript: String
+    let readContentScript: String
+
+    static let terminal = TerminalAppConfig(
+        name: "terminal",
+        activateScript: """
             tell application "Terminal"
                 activate
             end tell
-        """)
-    }
-
-    static func readContent() -> String {
-        runAppleScript("""
+        """,
+        readContentScript: """
             tell application "Terminal"
                 get contents of selected tab of front window
             end tell
-        """) ?? ""
-    }
+        """
+    )
 
-    static func clearLine() {
-        // Ctrl+U: kill whole line
-        simulateKeystroke(virtualKey: 0x20, control: true)
-    }
+    static let iterm = TerminalAppConfig(
+        name: "iterm",
+        activateScript: """
+            tell application "iTerm2"
+                activate
+            end tell
+        """,
+        readContentScript: """
+            tell application "iTerm2"
+                tell current session of current tab of current window
+                    get contents
+                end tell
+            end tell
+        """
+    )
+
+    static let ghostty = TerminalAppConfig(
+        name: "ghostty",
+        activateScript: """
+            tell application "Ghostty"
+                activate
+            end tell
+        """,
+        // Ghostty has no native AppleScript — use System Events UI scripting
+        readContentScript: """
+            tell application "System Events"
+                tell process "ghostty"
+                    set frontWindow to window 1
+                    set uiElems to entire contents of frontWindow
+                    set result to ""
+                    repeat with elem in uiElems
+                        try
+                            set v to value of elem
+                            if v is not missing value and class of v is text then
+                                set result to result & v
+                            end if
+                        end try
+                    end repeat
+                    return result
+                end tell
+            end tell
+        """
+    )
 }
 
-// MARK: - Terminal Test Runner
+// MARK: - Generic Terminal Test Runner
 
-func runTerminalTests(
+func runGenericTerminalTests(
+    config: TerminalAppConfig,
     delays: [Int],
     texts: [(name: String, text: String)],
     repetitions: Int
 ) -> [DelayTestResult] {
     var results: [DelayTestResult] = []
 
-    TerminalScript.activate()
+    runAppleScript(config.activateScript)
     Thread.sleep(forTimeInterval: 0.5)
+
+    // Verify we can read content
+    let probe = runAppleScript(config.readContentScript)
+    if probe == nil {
+        print("  WARNUNG: AppleScript readContent fuer \(config.name) liefert nil.")
+        print("  Versuche trotzdem fortzufahren...")
+    }
 
     for delay in delays {
         for (name, text) in texts {
@@ -209,12 +260,12 @@ func runTerminalTests(
             fflush(stdout)
 
             for _ in 0..<repetitions {
-                // Clear current line
-                TerminalScript.clearLine()
+                // Clear current line (Ctrl+U)
+                simulateKeystroke(virtualKey: 0x20, control: true)
                 Thread.sleep(forTimeInterval: 0.1)
 
-                // Snapshot terminal content before paste
-                let contentBefore = TerminalScript.readContent()
+                // Snapshot content before paste
+                let contentBefore = runAppleScript(config.readContentScript) ?? ""
 
                 setClipboard(text)
                 Thread.sleep(forTimeInterval: 0.03)
@@ -225,19 +276,17 @@ func runTerminalTests(
                 // Simulate restore: overwrite clipboard
                 setClipboard("__RESTORED__")
 
-                // Wait for Terminal to process paste
+                // Wait for app to process paste
                 Thread.sleep(forTimeInterval: 0.25)
 
-                // Read terminal content and check for pasted text
-                let contentAfter = TerminalScript.readContent()
-                let newContent = String(contentAfter.dropFirst(min(contentBefore.count, contentAfter.count)))
+                // Read content and check for pasted text
+                let contentAfter = runAppleScript(config.readContentScript) ?? ""
                 let expected = text.trimmingCharacters(in: .whitespacesAndNewlines)
 
-                // Check if the expected text appears in the new terminal content
-                let found = newContent.contains(expected) || contentAfter.hasSuffix(expected)
-                    || contentAfter.contains(expected + "\n")
-                    || contentAfter.range(of: expected, options: .backwards) != nil
-                    && !contentBefore.contains(expected)
+                // Check if expected text newly appears in terminal content
+                let appearedAfter = contentAfter.contains(expected)
+                let wasAlreadyThere = contentBefore.contains(expected)
+                let found = appearedAfter && !wasAlreadyThere
 
                 if found {
                     successes += 1
@@ -247,8 +296,8 @@ func runTerminalTests(
                 }
                 fflush(stdout)
 
-                // Clean up: Ctrl+U to clear pasted text from prompt
-                TerminalScript.clearLine()
+                // Clean up: Ctrl+U
+                simulateKeystroke(virtualKey: 0x20, control: true)
                 Thread.sleep(forTimeInterval: 0.05)
             }
 
@@ -256,7 +305,7 @@ func runTerminalTests(
             print(" \(successes)/\(repetitions)")
 
             results.append(DelayTestResult(
-                app: "terminal",
+                app: config.name,
                 textLength: name,
                 textChars: text.count,
                 delayMs: delay,
@@ -268,6 +317,19 @@ func runTerminalTests(
     }
 
     return results
+}
+
+// Convenience wrappers
+func runTerminalTests(delays: [Int], texts: [(name: String, text: String)], repetitions: Int) -> [DelayTestResult] {
+    runGenericTerminalTests(config: .terminal, delays: delays, texts: texts, repetitions: repetitions)
+}
+
+func runITermTests(delays: [Int], texts: [(name: String, text: String)], repetitions: Int) -> [DelayTestResult] {
+    runGenericTerminalTests(config: .iterm, delays: delays, texts: texts, repetitions: repetitions)
+}
+
+func runGhosttyTests(delays: [Int], texts: [(name: String, text: String)], repetitions: Int) -> [DelayTestResult] {
+    runGenericTerminalTests(config: .ghostty, delays: delays, texts: texts, repetitions: repetitions)
 }
 
 // MARK: - Report
