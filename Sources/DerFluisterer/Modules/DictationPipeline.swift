@@ -159,13 +159,12 @@ public final class DictationPipeline {
     }
 
     public func loadModelAndActivate() async {
-        let modelName = deps.settings.audio.whisperModel.rawValue
         let language = deps.settings.audio.language.transcriptionLanguage
-        FileLog.log("loadModelAndActivate START — model=\(modelName) language=\(language)")
+        FileLog.log("loadModelAndActivate START — language=\(language)")
         FileLog.log("Task.isCancelled=\(Task.isCancelled)")
         state = .loadingModel(progress: 0)
 
-        let estimatedDuration = Duration.seconds(deps.settings.audio.whisperModel.estimatedLoadTimeSeconds(for: deps.settings.audio.whisperEngine))
+        let estimatedDuration = Duration.seconds(5)
         let simulated = SimulatedProgress(estimatedDuration: estimatedDuration)
 
         let progressTask = Task.detached { @Sendable in
@@ -349,7 +348,7 @@ public final class DictationPipeline {
         collectedChunks = []
         return CollectedAudioBuffer(
             samples: chunks.flatMap { $0.samples },
-            sampleRate: chunks.first?.sampleRate ?? AudioProcessingUtils.whisperSampleRate,
+            sampleRate: chunks.first?.sampleRate ?? AudioProcessingUtils.transcriptionSampleRate,
             totalDuration: chunks.reduce(0.0) { $0 + $1.duration }
         )
     }
@@ -549,8 +548,8 @@ public final class DictationPipeline {
             insertionMs: timings.insertionMs,
             usedStreamingResult: timings.usedStreamingResult,
             audioSampleCount: timings.audioSampleCount,
-            whisperModel: deps.settings.audio.whisperModel.rawValue,
-            whisperEngine: deps.settings.audio.whisperEngine.rawValue,
+            whisperModel: nil,
+            whisperEngine: nil,
             stopSoundMs: timings.stopSoundMs,
             recorderStopMs: timings.recorderStopMs,
             streamingWaitMs: timings.streamingWaitMs

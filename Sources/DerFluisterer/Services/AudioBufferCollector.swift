@@ -15,7 +15,7 @@ public struct CollectedAudioBuffer: Sendable {
 public enum AudioBufferCollector {
     public static func collect(from stream: AsyncStream<AudioChunk>) async -> CollectedAudioBuffer {
         var allSamples: [Float] = []
-        var sampleRate = AudioProcessingUtils.whisperSampleRate
+        var sampleRate = AudioProcessingUtils.transcriptionSampleRate
         var totalDuration: TimeInterval = 0
 
         for await chunk in stream {

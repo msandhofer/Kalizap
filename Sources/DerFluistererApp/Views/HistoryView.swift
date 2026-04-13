@@ -146,8 +146,6 @@ struct HistoryEntryRow: View {
         ].compactMap { $0 }
 
         let meta: [String] = [
-            entry.whisperModel,
-            entry.whisperEngine,
             entry.audioSampleCount.map { "\(String(format: "%.1f", Double($0) / 16000.0))s Audio" },
         ].compactMap { $0 }
 

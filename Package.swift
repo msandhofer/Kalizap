@@ -1,17 +1,16 @@
-// swift-tools-version: 6.1
+// swift-tools-version: 6.2
 
 import PackageDescription
 
 let package = Package(
     name: "DerFluisterer",
     platforms: [
-        .macOS(.v15)
+        .macOS(.v26)
     ],
     products: [
         .library(name: "DerFluisterer", targets: ["DerFluisterer"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "0.12.0"),
         .package(url: "https://github.com/sparkle-project/Sparkle.git", from: "2.7.0"),
         .package(url: "https://github.com/soniqo/speech-swift", branch: "main"),
     ],
@@ -29,28 +28,9 @@ let package = Package(
             ]
         ),
         .target(
-            name: "CWhisper",
-            path: "Sources/CWhisper",
-            exclude: ["lib"],
-            publicHeadersPath: "include",
-            linkerSettings: [
-                .unsafeFlags([
-                    "-L", "Sources/CWhisper/lib",
-                    "-lwhisper",
-                ]),
-                .linkedFramework("Accelerate"),
-                .linkedFramework("Metal"),
-                .linkedFramework("MetalKit"),
-                .linkedFramework("CoreML"),
-                .linkedFramework("Foundation"),
-            ]
-        ),
-        .target(
             name: "DerFluisterer",
             dependencies: [
                 "CDeepFilter",
-                "CWhisper",
-                "WhisperKit",
                 .product(name: "Sparkle", package: "Sparkle"),
             ]
         ),
@@ -60,6 +40,14 @@ let package = Package(
             exclude: ["Info.plist"],
             resources: [
                 .copy("Resources/DeepFilterNet3_onnx.tar.gz"),
+            ],
+            linkerSettings: [
+                .unsafeFlags([
+                    "-Xlinker", "-sectcreate",
+                    "-Xlinker", "__TEXT",
+                    "-Xlinker", "__info_plist",
+                    "-Xlinker", "Sources/DerFluistererApp/Info.plist",
+                ]),
             ]
         ),
         .executableTarget(
@@ -73,11 +61,6 @@ let package = Package(
             path: "Tools/AudioTestCLI"
         ),
         .executableTarget(
-            name: "TranscribeTestCLI",
-            dependencies: ["DerFluisterer"],
-            path: "Tools/TranscribeTestCLI"
-        ),
-        .executableTarget(
             name: "TextInsertTestCLI",
             dependencies: ["DerFluisterer"],
             path: "Tools/TextInsertTestCLI"
@@ -86,11 +69,6 @@ let package = Package(
             name: "CorrectorTestCLI",
             dependencies: ["DerFluisterer"],
             path: "Tools/CorrectorTestCLI"
-        ),
-        .executableTarget(
-            name: "WhisperModelTestCLI",
-            dependencies: ["DerFluisterer", "WhisperKit"],
-            path: "Tools/WhisperModelTestCLI"
         ),
         .executableTarget(
             name: "VoiceProcessingTestCLI",
@@ -116,15 +94,6 @@ let package = Package(
         .target(
             name: "STTTestCommon",
             path: "Tools/STTTestCommon"
-        ),
-        .executableTarget(
-            name: "WhisperCppTestCLI",
-            dependencies: [
-                "DerFluisterer",
-                "STTTestCommon",
-                .product(name: "SpeechVAD", package: "speech-swift"),
-            ],
-            path: "Tools/WhisperCppTestCLI"
         ),
         .executableTarget(
             name: "SpeechAnalyzerTestCLI",

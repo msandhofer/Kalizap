@@ -4,8 +4,8 @@ import Accelerate
 /// Shared audio processing utilities used across the pipeline.
 public enum AudioProcessingUtils {
 
-    /// Standard sample rate for Whisper transcription (16 kHz).
-    public static let whisperSampleRate = 16_000
+    /// Standard sample rate for transcription (16 kHz).
+    public static let transcriptionSampleRate = 16_000
 
     /// Sample rate required by DeepFilterNet3 (48 kHz).
     public static let deepFilterSampleRate = 48_000

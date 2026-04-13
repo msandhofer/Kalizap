@@ -57,19 +57,6 @@ final class SettingsManagerDefaultsTests: XCTestCase {
         XCTAssertEqual(sut.audio, AudioSettings())
     }
 
-    func test_audioSettings_whisperModelDefaultIsLargeV3Turbo() {
-        let sut = makeSettingsManager()
-        XCTAssertEqual(sut.audio.whisperModel, .largeV3Turbo)
-    }
-
-    func test_whisperModelRawValues_matchWhisperKitIdentifiers() {
-        XCTAssertEqual(WhisperModel.tiny.rawValue, "tiny")
-        XCTAssertEqual(WhisperModel.base.rawValue, "base")
-        XCTAssertEqual(WhisperModel.small.rawValue, "small")
-        XCTAssertEqual(WhisperModel.largeV3.rawValue, "large-v3")
-        XCTAssertEqual(WhisperModel.largeV3Turbo.rawValue, "large-v3_turbo")
-    }
-
     func test_newSettingsManager_hasCorrectHotkeyDefaults() {
         let sut = makeSettingsManager()
         XCTAssertEqual(sut.hotkey, HotkeySettings())
@@ -105,17 +92,6 @@ final class SettingsManagerDefaultsTests: XCTestCase {
 
 @MainActor
 final class SettingsManagerPersistenceTests: XCTestCase {
-
-    func test_audioSettings_whisperModelPersistsAcrossInstances() {
-        let suiteName = "test.persist.\(UUID())"
-        let keychain = MockKeychainService()
-
-        let first = makeSettingsManager(suiteName: suiteName, keychain: keychain)
-        first.audio.whisperModel = .small
-
-        let second = makeSettingsManager(suiteName: suiteName, keychain: keychain)
-        XCTAssertEqual(second.audio.whisperModel, .small)
-    }
 
     func test_audioSettings_persistAcrossInstances() {
         let suiteName = "test.persist.\(UUID())"

@@ -61,6 +61,13 @@ public enum TranscriptionResult: Sendable {
 public enum TranscriptionLanguage: String, Sendable {
     case german = "de"
     case english = "en"
+
+    public var locale: Locale {
+        switch self {
+        case .german: Locale(identifier: "de_DE")
+        case .english: Locale(identifier: "en_US")
+        }
+    }
 }
 
 public enum TranscriptionError: Error, Sendable, Equatable, LocalizedError {
@@ -72,7 +79,7 @@ public enum TranscriptionError: Error, Sendable, Equatable, LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .modelNotLoaded: "Whisper-Modell nicht geladen"
+        case .modelNotLoaded: "Sprachmodell nicht geladen"
         case .modelLoadFailed(let reason): "Modell-Laden fehlgeschlagen: \(reason)"
         case .streamingFailed(let reason): "Streaming fehlgeschlagen: \(reason)"
         case .batchFailed(let reason): "Transkription fehlgeschlagen: \(reason)"

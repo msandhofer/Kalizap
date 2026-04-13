@@ -71,7 +71,7 @@ final class AppState {
     // MARK: - Private
 
     private func startPipeline() async {
-        FileLog.log("startPipeline — model=\(settings.audio.whisperModel.rawValue) engine=\(settings.audio.whisperEngine.rawValue)")
+        FileLog.log("startPipeline — language=\(settings.audio.language.rawValue)")
         let p = await PipelineFactory.makePipeline(settings: settings, store: store)
 
         p.onCorrectionFallback = { [weak self] in
@@ -102,44 +102,33 @@ final class AppState {
     }
 
     /// Observe settings that require a pipeline restart.
-    /// Only whisperModel and noiseSuppressionEnabled need a restart — other settings
-    /// like language, correction, and sounds are read fresh per dictation.
+    /// Language and noiseSuppressionEnabled need a restart — other settings
+    /// like correction and sounds are read fresh per dictation.
     /// Uses Swift Observation directly — no SwiftUI dependency.
     private func observeSettingsChanges() {
-        lastObservedModel = settings.audio.whisperModel
         lastObservedNS = settings.audio.noiseSuppressionEnabled
-        lastObservedEngine = settings.audio.whisperEngine
-        lastObservedCoreML = settings.audio.useCoreML
+        lastObservedLanguage = settings.audio.language
         scheduleObservation()
     }
 
-    private var lastObservedModel: WhisperModel = .largeV3Turbo
     private var lastObservedNS: Bool = true
-    private var lastObservedEngine: WhisperEngine = .whisperCpp
-    private var lastObservedCoreML: Bool = false
+    private var lastObservedLanguage: SupportedLanguage = .de
 
     private func scheduleObservation() {
         withObservationTracking {
-            _ = settings.audio.whisperModel
             _ = settings.audio.noiseSuppressionEnabled
-            _ = settings.audio.whisperEngine
-            _ = settings.audio.useCoreML
+            _ = settings.audio.language
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                // Re-register BEFORE async work so changes during restart aren't missed
                 self.scheduleObservation()
 
-                let newModel = self.settings.audio.whisperModel
                 let newNS = self.settings.audio.noiseSuppressionEnabled
-                let newEngine = self.settings.audio.whisperEngine
-                let newCoreML = self.settings.audio.useCoreML
-                if newModel != self.lastObservedModel || newNS != self.lastObservedNS || newEngine != self.lastObservedEngine || newCoreML != self.lastObservedCoreML {
-                    FileLog.log("AppState — settings changed: model=\(newModel.rawValue) engine=\(newEngine.rawValue) ns=\(newNS) coreml=\(newCoreML)")
-                    self.lastObservedModel = newModel
+                let newLanguage = self.settings.audio.language
+                if newNS != self.lastObservedNS || newLanguage != self.lastObservedLanguage {
+                    FileLog.log("AppState — settings changed: language=\(newLanguage.rawValue) ns=\(newNS)")
                     self.lastObservedNS = newNS
-                    self.lastObservedEngine = newEngine
-                    self.lastObservedCoreML = newCoreML
+                    self.lastObservedLanguage = newLanguage
                     await self.restartPipeline()
                 }
             }

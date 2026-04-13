@@ -103,9 +103,6 @@ struct UpdateSettingsSection: View {
 struct AudioSettingsSection: View {
     @Bindable var settings: SettingsManager
     @State private var devices: [AudioDevice] = []
-    @State private var coreMLDownloadTask: Task<Void, Never>?
-    @State private var coreMLDownloadProgress: Double = 0
-    @State private var coreMLDownloadError: String?
 
     var body: some View {
         Section("Mikrofon") {
@@ -121,57 +118,6 @@ struct AudioSettingsSection: View {
             .onAppear {
                 devices = CoreAudioDeviceProvider().listDevices()
             }
-        }
-
-        Section("Whisper Engine") {
-            Picker("Engine", selection: $settings.audio.whisperEngine) {
-                ForEach(WhisperEngine.allCases, id: \.self) { engine in
-                    Text(engine.displayName).tag(engine)
-                }
-            }
-            .pickerStyle(.segmented)
-            Text(engineDescription)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-
-        if settings.audio.whisperEngine == .whisperCpp {
-            Section("CoreML Neural Engine") {
-                Toggle("CoreML Neural Engine", isOn: coreMLToggleBinding)
-
-                if coreMLDownloadTask != nil {
-                    ProgressView(value: coreMLDownloadProgress)
-                        .padding(.vertical, 2)
-                    Text("CoreML-Encoder wird heruntergeladen… \(Int(coreMLDownloadProgress * 100))%")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else if settings.audio.useCoreML {
-                    Text("Beim ersten Diktat wird das Modell einmalig für diesen Mac optimiert (~2-8 Min).")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("Nutzt Apples Neural Engine für ~2x schnellere Transkription. Erfordert einmaligen Download (~1.2 GB).")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                if let error = coreMLDownloadError {
-                    Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                        .font(.caption)
-                }
-            }
-        }
-
-        Section("Whisper-Modell") {
-            Picker("Modell", selection: $settings.audio.whisperModel) {
-                ForEach(WhisperModel.allCases, id: \.self) { model in
-                    Text(model.displayName).tag(model)
-                }
-            }
-            Text("Modell wird nach Auswahl automatisch neu geladen.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
 
         Section("Sprache") {
@@ -191,71 +137,6 @@ struct AudioSettingsSection: View {
 
         Section("Feedback") {
             Toggle("Sounds aktiviert", isOn: $settings.audio.soundsEnabled)
-        }
-        .onChange(of: settings.audio.whisperModel) { _, _ in
-            cancelCoreMLDownload()
-        }
-        .onChange(of: settings.audio.whisperEngine) { _, newValue in
-            if newValue != .whisperCpp {
-                cancelCoreMLDownload()
-            }
-        }
-    }
-
-    // MARK: - CoreML Download
-
-    private var coreMLToggleBinding: Binding<Bool> {
-        Binding(
-            get: { settings.audio.useCoreML || coreMLDownloadTask != nil },
-            set: { newValue in
-                if newValue {
-                    let model = settings.audio.whisperModel
-                    if GGMLModelManager.shared.isCoreMLEncoderAvailable(for: model) {
-                        settings.audio.useCoreML = true
-                    } else {
-                        startCoreMLDownload(for: model)
-                    }
-                } else {
-                    cancelCoreMLDownload()
-                    settings.audio.useCoreML = false
-                }
-            }
-        )
-    }
-
-    private func startCoreMLDownload(for model: WhisperModel) {
-        coreMLDownloadError = nil
-        coreMLDownloadProgress = 0
-        coreMLDownloadTask = Task {
-            do {
-                _ = try await GGMLModelManager.shared.downloadCoreMLEncoder(for: model) { progress in
-                    Task { @MainActor in
-                        coreMLDownloadProgress = progress
-                    }
-                }
-                settings.audio.useCoreML = true
-            } catch {
-                if !Task.isCancelled {
-                    coreMLDownloadError = "Download fehlgeschlagen: \(error.localizedDescription)"
-                }
-            }
-            coreMLDownloadTask = nil
-        }
-    }
-
-    private func cancelCoreMLDownload() {
-        coreMLDownloadTask?.cancel()
-        coreMLDownloadTask = nil
-        coreMLDownloadProgress = 0
-        coreMLDownloadError = nil
-    }
-
-    private var engineDescription: String {
-        switch settings.audio.whisperEngine {
-        case .whisperKit:
-            "Nutzt Apple Neural Engine. Erste Nutzung erfordert Kompilierung (30s-8min)."
-        case .whisperCpp:
-            "Nutzt CPU/Metal GPU. Kein Cold-Start, sofort einsatzbereit."
         }
     }
 }

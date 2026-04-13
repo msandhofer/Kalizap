@@ -18,5 +18,7 @@
 	<string>https://github.com/msandhofer/Fluesterclon/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string></string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>DerFluesterer nutzt Spracherkennung um Ihre Diktate in Text umzuwandeln.</string>
 </dict>
 </plist>

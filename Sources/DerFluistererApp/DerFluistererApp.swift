@@ -15,7 +15,7 @@ struct DerFluistererApp: App {
         let container = try! ModelContainer(for: DictationRecord.self)
         let store: any DictationStoring = DictationStoreImpl(modelContainer: container)
         _appState = State(initialValue: AppState(settings: settings, store: store))
-        FileLog.log("App.init completed — model setting=\(settings.audio.whisperModel.rawValue)")
+        FileLog.log("App.init completed — language=\(settings.audio.language.rawValue)")
     }
 
     var body: some Scene {

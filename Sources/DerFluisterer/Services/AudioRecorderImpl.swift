@@ -8,7 +8,7 @@ public final class AudioRecorderImpl: AudioRecording, @unchecked Sendable {
     private var levelContinuation: AsyncStream<AudioLevel>.Continuation?
     private var audioContinuation: AsyncThrowingStream<AudioChunk, Error>.Continuation?
     private var devicesContinuation: AsyncStream<[AudioDevice]>.Continuation?
-    private let sampleRate: Int = AudioProcessingUtils.whisperSampleRate
+    private let sampleRate: Int = AudioProcessingUtils.transcriptionSampleRate
 
     // MARK: - AudioCapturing
 
@@ -41,7 +41,7 @@ public final class AudioRecorderImpl: AudioRecording, @unchecked Sendable {
         self.availableDevices = AsyncStream { devicesCont = $0 }
         self.devicesContinuation = devicesCont
 
-        let adapter = AudioQueueAdapter(sampleRate: AudioProcessingUtils.whisperSampleRate, noiseSuppressor: noiseSuppressor) { level in
+        let adapter = AudioQueueAdapter(sampleRate: AudioProcessingUtils.transcriptionSampleRate, noiseSuppressor: noiseSuppressor) { level in
             levelCont?.yield(level)
         }
         self.coordinator = AudioSessionCoordinator(engine: adapter)
