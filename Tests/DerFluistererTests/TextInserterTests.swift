@@ -119,4 +119,19 @@ final class TextInserterTests: XCTestCase {
 
         XCTAssertEqual(clipboard.restoredSnapshot?.data, Data("original".utf8))
     }
+
+    // MARK: - Pending fallback leaves text in clipboard
+
+    func test_insert_clipboardBackupFails_leavesTextInClipboardForManualPaste() async {
+        let clipboard = MockClipboardManager()
+        clipboard.backupError = NSError(domain: "test", code: 1)
+        let accessibility = MockAccessibilityInserter(hasTextField: false)
+        let (sut, _, _, _, _) = makeSUT(clipboard: clipboard, accessibility: accessibility)
+
+        let result = await sut.insert("stranded text")
+
+        XCTAssertEqual(result.outcome, .pendingInClipboard)
+        XCTAssertEqual(clipboard.setText, "stranded text",
+                       "Bei Backup-Fehler muss der Text trotzdem im Clipboard landen, damit der User ihn manuell einfügen kann")
+    }
 }

@@ -43,7 +43,8 @@ struct HistoryViewModelTests {
         #expect(vm.entries.isEmpty)
 
         try await store.save(makeEntry(correctedText: "Neuer Eintrag"))
-        try? await Task.sleep(for: .milliseconds(100))
+        let arrived = await waitUntil { await MainActor.run { vm.entries.count == 1 } }
+        #expect(arrived)
 
         #expect(vm.entries.count == 1)
         #expect(vm.entries[0].correctedText == "Neuer Eintrag")

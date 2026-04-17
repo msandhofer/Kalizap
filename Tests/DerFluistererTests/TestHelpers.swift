@@ -139,3 +139,24 @@ func makeTestAudioStream(_ chunks: [AudioChunk]) -> AsyncStream<AudioChunk> {
         continuation.finish()
     }
 }
+
+// MARK: - Async Wait Helpers
+
+/// Poll for an async condition until it returns true, or the timeout elapses.
+/// Returns true on success, false on timeout. Stabilere Alternative zu hart
+/// codierten Task.sleep-Waits in Tests: prüft die Bedingung alle paar ms und
+/// kehrt zurück, sobald sie erfüllt ist — spart Zeit auf schnellen Rechnern,
+/// schlägt deterministisch fehl auf langsamen.
+@Sendable
+func waitUntil(
+    timeout: Duration = .seconds(2),
+    pollInterval: Duration = .milliseconds(10),
+    _ condition: @Sendable () async -> Bool
+) async -> Bool {
+    let deadline = ContinuousClock.now.advanced(by: timeout)
+    while ContinuousClock.now < deadline {
+        if await condition() { return true }
+        try? await Task.sleep(for: pollInterval)
+    }
+    return await condition()
+}

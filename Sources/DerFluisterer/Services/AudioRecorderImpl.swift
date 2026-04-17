@@ -5,7 +5,7 @@ import AudioToolbox
 /// Thread-safe holder for the spectrum handler closure.
 /// Lives as a standalone reference type so the `onSpectrum` callback
 /// can capture it without needing a fully-initialized `AudioRecorderImpl`.
-private final class SpectrumHandlerBox: @unchecked Sendable {
+final class SpectrumHandlerBox: @unchecked Sendable {
     private let lock = NSLock()
     private var handler: (@Sendable ([Float]) -> Void)?
 
