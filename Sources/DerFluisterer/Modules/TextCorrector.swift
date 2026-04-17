@@ -2,6 +2,7 @@ import Foundation
 
 public struct CorrectionConfig: Sendable {
     public var contextMode: ContextMode = .neutral
+    public var tasks: CorrectionTasks = .init()
     public var intensity: CorrectionIntensity = .init()
     public var personalDictionary: [String] = []
     public var timeoutMs: Int = 800
@@ -9,12 +10,14 @@ public struct CorrectionConfig: Sendable {
 
     public init(
         contextMode: ContextMode = .neutral,
+        tasks: CorrectionTasks = .init(),
         intensity: CorrectionIntensity = .init(),
         personalDictionary: [String] = [],
         timeoutMs: Int = 800,
         maxRetries: Int = 1
     ) {
         self.contextMode = contextMode
+        self.tasks = tasks
         self.intensity = intensity
         self.personalDictionary = personalDictionary
         self.timeoutMs = timeoutMs
@@ -23,6 +26,7 @@ public struct CorrectionConfig: Sendable {
 
     public init(from settings: CorrectionSettings, resolvedContextMode: ContextMode) {
         self.contextMode = resolvedContextMode
+        self.tasks = settings.tasks
         self.intensity = CorrectionIntensity(
             allowRephrasing: settings.allowRephrasing,
             allowShortening: settings.allowShortening,
@@ -50,6 +54,7 @@ public enum FallbackReason: Sendable {
     case timeout
     case retryExhausted
     case emptyResponse
+    case llmDisabled
 }
 
 public enum CorrectionOutcome: Sendable {

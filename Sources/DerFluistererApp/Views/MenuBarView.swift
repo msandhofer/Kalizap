@@ -6,7 +6,7 @@ struct MenuBarView: View {
     var pipeline: DictationPipeline?
     var updater: SparkleUpdater?
     var historyVM: HistoryViewModel
-    @Environment(\.openSettings) private var openSettings
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(spacing: 8) {
@@ -148,7 +148,7 @@ struct MenuBarView: View {
     }
 
     private func activateAndOpenSettings() {
-        WindowActivation.activateTemporarily { openSettings() }
+        WindowActivation.activateTemporarily { openWindow(id: "settings") }
     }
 }
 

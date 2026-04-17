@@ -86,6 +86,80 @@ final class SettingsManagerDefaultsTests: XCTestCase {
         XCTAssertEqual(defaults.appMapping["com.tinyspeck.slackmacgap"], .informal)
         XCTAssertEqual(defaults.appMapping["com.microsoft.Outlook"], .formal)
     }
+
+    func test_correctionSettings_taskFlagsDefaultTrue() {
+        let defaults = CorrectionSettings()
+        XCTAssertTrue(defaults.taskGrammar)
+        XCTAssertTrue(defaults.taskFillerRemoval)
+        XCTAssertTrue(defaults.taskWrittenLanguage)
+        XCTAssertTrue(defaults.taskPunctuation)
+        XCTAssertTrue(defaults.taskPreventHallucination)
+        XCTAssertTrue(defaults.isLLMEnabled)
+    }
+
+    func test_correctionSettings_isLLMEnabledFalseWhenAllTasksOff() {
+        var settings = CorrectionSettings()
+        settings.taskGrammar = false
+        settings.taskFillerRemoval = false
+        settings.taskWrittenLanguage = false
+        settings.taskPunctuation = false
+        settings.taskPreventHallucination = false
+        XCTAssertFalse(settings.isLLMEnabled)
+    }
+}
+
+// MARK: - Migration
+
+@MainActor
+final class SettingsManagerMigrationTests: XCTestCase {
+
+    func test_correctionSettings_legacyJSONWithoutTaskFlags_decodesWithTrueDefaults() throws {
+        // Simulates a JSON persisted before Issue #37 (no task* keys).
+        let legacyJSON = """
+        {
+            "contextMode": "formal",
+            "appMapping": {},
+            "allowRephrasing": true,
+            "allowShortening": false,
+            "allowRestructuring": false,
+            "personalDictionary": ["SwiftUI"],
+            "llmTimeoutMs": 1500,
+            "showAPIKeyNotification": false
+        }
+        """
+        let data = legacyJSON.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode(CorrectionSettings.self, from: data)
+
+        XCTAssertTrue(decoded.taskGrammar)
+        XCTAssertTrue(decoded.taskFillerRemoval)
+        XCTAssertTrue(decoded.taskWrittenLanguage)
+        XCTAssertTrue(decoded.taskPunctuation)
+        XCTAssertTrue(decoded.taskPreventHallucination)
+        // Existing fields preserved
+        XCTAssertEqual(decoded.contextMode, .formal)
+        XCTAssertTrue(decoded.allowRephrasing)
+        XCTAssertEqual(decoded.personalDictionary, ["SwiftUI"])
+        XCTAssertEqual(decoded.llmTimeoutMs, 1500)
+        XCTAssertFalse(decoded.showAPIKeyNotification)
+    }
+
+    func test_correctionSettings_emptyJSON_yieldsAllDefaults() throws {
+        let emptyJSON = "{}".data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(CorrectionSettings.self, from: emptyJSON)
+        XCTAssertEqual(decoded, CorrectionSettings())
+    }
+
+    func test_correctionSettings_roundTripPreservesTaskFlags() throws {
+        var original = CorrectionSettings()
+        original.taskGrammar = false
+        original.taskPreventHallucination = false
+
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(CorrectionSettings.self, from: data)
+
+        XCTAssertEqual(decoded, original)
+    }
 }
 
 // MARK: - Persistence

@@ -58,6 +58,11 @@ final class HotkeyEventDispatcher: @unchecked Sendable {
     }
 
     func updateConfiguration(_ newConfig: HotkeyConfiguration) {
+        // Stop an in-flight recording cleanly before the old keyCode becomes unreachable.
+        if isRecording {
+            isRecording = false
+            continuation?.yield(.recordingStopped)
+        }
         currentConfiguration = newConfig
     }
 

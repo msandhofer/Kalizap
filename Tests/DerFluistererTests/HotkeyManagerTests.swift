@@ -234,4 +234,36 @@ final class HotkeyConfigUpdateTests: XCTestCase {
         await task.value
         XCTAssertEqual(collected, [.recordingStarted, .recordingStopped, .recordingStarted, .recordingStopped])
     }
+
+    func test_updateConfiguration_duringActiveRecording_emitsStoppedToAvoidHang() async throws {
+        let dispatcher = HotkeyEventDispatcher(configuration: .default) // 0x3D
+        var collected: [HotkeyEvent] = []
+
+        let task = Task {
+            for await event in dispatcher.events {
+                collected.append(event)
+            }
+        }
+
+        // Start recording with old key
+        dispatcher.handleKeyDown(keyCode: 0x3D)
+
+        // Swap config while recording is still active (user changes hotkey mid-press).
+        // Without the clean stop, the old keyUp would be silently ignored and the
+        // pipeline would hang in "recording" forever.
+        dispatcher.updateConfiguration(HotkeyConfiguration(keyCode: 0x38, modifierFlags: 0, requiresHold: true))
+
+        // Old keyUp now ignored (but recording was already stopped cleanly).
+        dispatcher.handleKeyUp(keyCode: 0x3D)
+
+        // New key should work normally.
+        dispatcher.handleKeyDown(keyCode: 0x38)
+        dispatcher.handleKeyUp(keyCode: 0x38)
+
+        try await Task.sleep(for: .milliseconds(50))
+        dispatcher.finish()
+
+        await task.value
+        XCTAssertEqual(collected, [.recordingStarted, .recordingStopped, .recordingStarted, .recordingStopped])
+    }
 }

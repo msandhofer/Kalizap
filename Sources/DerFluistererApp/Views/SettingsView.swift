@@ -4,17 +4,21 @@ import DerFluisterer
 
 struct SettingsView: View {
     @Bindable var settings: SettingsManager
+    @Bindable var appState: AppState
     var updater: SparkleUpdater?
 
     var body: some View {
         ScrollView {
             Form {
-                GeneralSettingsSection(settings: settings)
+                HotkeySettingsSection(settings: settings, appState: appState)
+                SystemSettingsSection(settings: settings)
                 UpdateSettingsSection(settings: settings, updater: updater)
-                AudioSettingsSection(settings: settings)
+                MicrophoneSettingsSection(settings: settings)
+                LanguageSettingsSection(settings: settings)
+                FeedbackSettingsSection(settings: settings)
                 CorrectionSettingsSection(settings: settings)
                 APIKeySettingsSection(settings: settings)
-                DictionarySettingsSection(settings: settings)
+                DebugSettingsSection(settings: settings, appState: appState)
             }
             .formStyle(.grouped)
             .padding()
@@ -22,10 +26,11 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - General
+// MARK: - Hotkey
 
-struct GeneralSettingsSection: View {
+struct HotkeySettingsSection: View {
     @Bindable var settings: SettingsManager
+    @Bindable var appState: AppState
 
     var body: some View {
         Section("Hotkey") {
@@ -34,28 +39,51 @@ struct GeneralSettingsSection: View {
                     Text(hotkey.name).tag(hotkey.keyCode)
                 }
             }
+            .onChange(of: settings.hotkey.keyCode) { _, _ in
+                appState.pipeline?.updateHotkey(settings.hotkey.configuration)
+            }
 
             Toggle("Halten zum Aufnehmen", isOn: $settings.hotkey.requiresHold)
-
-            Text("Hotkey-Änderung wird nach Neustart der App wirksam.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .onChange(of: settings.hotkey.requiresHold) { _, _ in
+                    appState.pipeline?.updateHotkey(settings.hotkey.configuration)
+                }
         }
+    }
+}
 
+// MARK: - System
+
+struct SystemSettingsSection: View {
+    @Bindable var settings: SettingsManager
+    @State private var autoStartError: String?
+
+    var body: some View {
         Section("System") {
             Toggle("Bei Login starten", isOn: Binding(
                 get: { settings.system.autoStart },
-                set: { newValue in try? settings.setAutoStart(newValue) }
+                set: { newValue in
+                    do {
+                        try settings.setAutoStart(newValue)
+                        autoStartError = nil
+                    } catch {
+                        autoStartError = error.localizedDescription
+                    }
+                }
             ))
 
-            Stepper(
-                "History-Limit: \(settings.system.historyLimit)",
-                value: $settings.system.historyLimit,
-                in: 10...1000,
-                step: 10
-            )
-
-            Toggle("Debug-Modus", isOn: $settings.system.debugMode)
+            if let autoStartError {
+                Label {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Automatischer Start fehlgeschlagen: \(autoStartError)")
+                        Text("Die App muss dafür im Ordner /Programme/ liegen und signiert sein.")
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(.caption)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                }
+            }
         }
     }
 }
@@ -98,9 +126,9 @@ struct UpdateSettingsSection: View {
     }
 }
 
-// MARK: - Audio
+// MARK: - Mikrofon
 
-struct AudioSettingsSection: View {
+struct MicrophoneSettingsSection: View {
     @Bindable var settings: SettingsManager
     @State private var devices: [AudioDevice] = []
 
@@ -119,7 +147,15 @@ struct AudioSettingsSection: View {
                 devices = CoreAudioDeviceProvider().listDevices()
             }
         }
+    }
+}
 
+// MARK: - Sprache
+
+struct LanguageSettingsSection: View {
+    @Bindable var settings: SettingsManager
+
+    var body: some View {
         Section("Sprache") {
             Picker("Sprache", selection: $settings.audio.language) {
                 Text("Deutsch").tag(SupportedLanguage.de)
@@ -127,24 +163,27 @@ struct AudioSettingsSection: View {
             }
             .pickerStyle(.segmented)
         }
+    }
+}
 
-        Section("Rauschunterdrückung") {
-            Toggle("DeepFilterNet3", isOn: $settings.audio.noiseSuppressionEnabled)
-            Text("Entfernt Hintergrundgeräusche in Echtzeit. Erfordert Neustart der Pipeline.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
+// MARK: - Feedback
 
+struct FeedbackSettingsSection: View {
+    @Bindable var settings: SettingsManager
+
+    var body: some View {
         Section("Feedback") {
             Toggle("Sounds aktiviert", isOn: $settings.audio.soundsEnabled)
         }
     }
 }
 
-// MARK: - Correction
+// MARK: - Correction (Context, Tasks, Intensity, Prompt-Preview)
 
 struct CorrectionSettingsSection: View {
     @Bindable var settings: SettingsManager
+
+    private var isLLMEnabled: Bool { settings.correction.isLLMEnabled }
 
     var body: some View {
         Section("Kontext-Modus") {
@@ -155,24 +194,64 @@ struct CorrectionSettingsSection: View {
                 Text("Auto").tag(ContextMode.auto)
             }
             .pickerStyle(.segmented)
+            .disabled(!isLLMEnabled)
+
+            if settings.correction.contextMode == .auto {
+                Text("Der Stil wird je nach Ziel-App aus der Zuordnungstabelle unten bestimmt.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
 
-        AppMappingSection(settings: settings)
+        if SettingsVisibility.showAppMapping(
+            contextMode: settings.correction.contextMode,
+            isLLMEnabled: isLLMEnabled
+        ) {
+            AppMappingSection(settings: settings)
+        }
+
+        Section("Aufgaben") {
+            Toggle("Grammatik und Rechtschreibung korrigieren", isOn: $settings.correction.taskGrammar)
+            Toggle("Füllwörter entfernen", isOn: $settings.correction.taskFillerRemoval)
+            Toggle("Gesprochene Sprache in Schriftsprache umwandeln", isOn: $settings.correction.taskWrittenLanguage)
+            Toggle("Zeichensetzung ergänzen", isOn: $settings.correction.taskPunctuation)
+            Toggle("Keine Halluzination (keine erfundenen Inhalte)", isOn: $settings.correction.taskPreventHallucination)
+
+            if !isLLMEnabled {
+                Label("LLM-Korrektur deaktiviert — Diktat wird nur transkribiert.",
+                      systemImage: "info.circle")
+                    .foregroundStyle(.orange)
+                    .font(.caption)
+            }
+        }
 
         Section("Korrektur-Intensität") {
             Toggle("Umformulieren erlaubt", isOn: $settings.correction.allowRephrasing)
             Toggle("Kürzen erlaubt", isOn: $settings.correction.allowShortening)
             Toggle("Satzstruktur umstellen erlaubt", isOn: $settings.correction.allowRestructuring)
         }
+        .disabled(!isLLMEnabled)
 
-        Section("LLM") {
-            Stepper(
-                "Timeout: \(settings.correction.llmTimeoutMs)ms",
-                value: $settings.correction.llmTimeoutMs,
-                in: 200...5000,
-                step: 100
-            )
+        Section("System-Prompt (Vorschau)") {
+            Text(promptPreviewText)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 4)
         }
+    }
+
+    private var promptPreviewText: String {
+        CorrectionPrompts.buildSystemPrompt(
+            tasks: settings.correction.tasks,
+            contextMode: settings.correction.contextMode,
+            intensity: CorrectionIntensity(
+                allowRephrasing: settings.correction.allowRephrasing,
+                allowShortening: settings.correction.allowShortening,
+                allowRestructuring: settings.correction.allowRestructuring
+            )
+        )
     }
 }
 
@@ -216,9 +295,6 @@ struct APIKeySettingsSection: View {
             }
 
             apiKeyStatusLabel
-
-            Toggle("Hinweis bei fehlender Korrektur anzeigen", isOn: $settings.correction.showAPIKeyNotification)
-                .font(.caption)
         }
         .onAppear {
             apiKeyInput = settings.apiKey.cachedKey ?? ""
@@ -243,50 +319,51 @@ struct APIKeySettingsSection: View {
     }
 }
 
-// MARK: - Dictionary
+// MARK: - Debug
 
-struct DictionarySettingsSection: View {
+struct DebugSettingsSection: View {
     @Bindable var settings: SettingsManager
-    @State private var newTerm = ""
+    @Bindable var appState: AppState
 
-    var body: some View {
-        Section("Persönliches Wörterbuch") {
-            HStack {
-                TextField("Neuer Begriff", text: $newTerm)
-                    .onSubmit { addTerm() }
-                Button("Hinzufügen") { addTerm() }
-                    .disabled(newTerm.isEmpty)
-            }
-
-            if settings.correction.personalDictionary.isEmpty {
-                Text("Noch keine Begriffe hinzugefügt")
-                    .foregroundStyle(.secondary)
-            } else {
-                List {
-                    ForEach(settings.correction.personalDictionary, id: \.self) { term in
-                        HStack {
-                            Text(term)
-                            Spacer()
-                            Button(role: .destructive) {
-                                settings.correction.personalDictionary.removeAll { $0 == term }
-                            } label: {
-                                Image(systemName: "trash")
-                            }
-                            .buttonStyle(.borderless)
-                        }
-                    }
-                }
-                .frame(minHeight: 150)
-            }
-        }
+    private var pipelineIsBusy: Bool {
+        guard let pipeline = appState.pipeline else { return true }
+        if case .loadingModel = pipeline.state { return true }
+        return false
     }
 
-    private func addTerm() {
-        let trimmed = newTerm.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty,
-              !settings.correction.personalDictionary.contains(trimmed) else { return }
-        settings.correction.personalDictionary.append(trimmed)
-        newTerm = ""
+    var body: some View {
+        Section("Debug-Modus") {
+            Toggle("Debug-Modus aktiv", isOn: $settings.system.debugMode)
+
+            if SettingsVisibility.showDebugSections(debugMode: settings.system.debugMode) {
+                HStack {
+                    Toggle("Rauschunterdrückung (DeepFilterNet3)",
+                           isOn: $settings.audio.noiseSuppressionEnabled)
+                        .disabled(pipelineIsBusy)
+                    if pipelineIsBusy {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
+
+                Stepper(
+                    "History-Limit: \(settings.system.historyLimit)",
+                    value: $settings.system.historyLimit,
+                    in: 10...1000,
+                    step: 10
+                )
+
+                Stepper(
+                    "LLM-Timeout: \(settings.correction.llmTimeoutMs)ms",
+                    value: $settings.correction.llmTimeoutMs,
+                    in: 200...5000,
+                    step: 100
+                )
+
+                Toggle("Hinweis bei fehlender Korrektur anzeigen",
+                       isOn: $settings.correction.showAPIKeyNotification)
+            }
+        }
     }
 }
 

@@ -26,6 +26,32 @@ public struct CorrectionIntensity: Codable, Equatable, Sendable {
     }
 }
 
+public struct CorrectionTasks: Codable, Equatable, Sendable {
+    public var grammar: Bool = true
+    public var fillerRemoval: Bool = true
+    public var writtenLanguage: Bool = true
+    public var punctuation: Bool = true
+    public var preventHallucination: Bool = true
+
+    public init(
+        grammar: Bool = true,
+        fillerRemoval: Bool = true,
+        writtenLanguage: Bool = true,
+        punctuation: Bool = true,
+        preventHallucination: Bool = true
+    ) {
+        self.grammar = grammar
+        self.fillerRemoval = fillerRemoval
+        self.writtenLanguage = writtenLanguage
+        self.punctuation = punctuation
+        self.preventHallucination = preventHallucination
+    }
+
+    public var isEmpty: Bool {
+        !grammar && !fillerRemoval && !writtenLanguage && !punctuation && !preventHallucination
+    }
+}
+
 public enum PipelineState: Equatable, Sendable {
     case loadingModel(progress: Double)
     case idle

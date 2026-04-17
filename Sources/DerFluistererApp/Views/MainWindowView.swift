@@ -1,23 +1,30 @@
+import AppKit
 import SwiftUI
 import DerFluisterer
 
 struct MainWindowView: View {
-    @Bindable var settings: SettingsManager
-    @Bindable var historyVM: HistoryViewModel
-    @Bindable var statisticsVM: StatisticsViewModel
+    @Bindable var appState: AppState
     var updater: SparkleUpdater?
 
     var body: some View {
         TabView {
-            HistoryView(viewModel: historyVM)
+            HistoryView(viewModel: appState.historyVM)
                 .tabItem { Label("History", systemImage: "clock.arrow.circlepath") }
 
-            SettingsView(settings: settings, updater: updater)
+            SettingsView(settings: appState.settings, appState: appState, updater: updater)
                 .tabItem { Label("Einstellungen", systemImage: "gear") }
 
-            StatisticsView(viewModel: statisticsVM)
+            StatisticsView(viewModel: appState.statisticsVM)
                 .tabItem { Label("Statistiken", systemImage: "chart.bar") }
         }
-        .frame(width: 560, height: 480)
+        .frame(
+            minWidth: 560, idealWidth: 600, maxWidth: .infinity,
+            minHeight: 480, idealHeight: 560, maxHeight: .infinity
+        )
+        .onAppear {
+            // Force the Settings window to become key so controls render in their
+            // active (colored) state instead of greyed-out "inactive" appearance.
+            NSApp.activate(ignoringOtherApps: true)
+        }
     }
 }

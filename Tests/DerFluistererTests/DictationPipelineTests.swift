@@ -4,7 +4,7 @@ import Foundation
 
 // MARK: - Pipeline Test Mocks
 
-final class PipelineHotkeyMock: HotkeyMonitoring, @unchecked Sendable {
+final class PipelineHotkeyMock: HotkeyMonitoring, HotkeyConfiguring, @unchecked Sendable {
     private var continuation: AsyncStream<HotkeyEvent>.Continuation?
 
     var events: AsyncStream<HotkeyEvent> {
@@ -13,10 +13,20 @@ final class PipelineHotkeyMock: HotkeyMonitoring, @unchecked Sendable {
     var accessibilityStatus: AccessibilityStatus { .granted }
     var isHealthy: Bool { true }
 
+    var currentConfiguration: HotkeyConfiguration = .default
+    var lastUpdatedConfiguration: HotkeyConfiguration?
+
     func start() async throws {}
     func stop() {}
     func suspend() {}
     func resume() {}
+
+    func updateConfiguration(_ configuration: HotkeyConfiguration) {
+        currentConfiguration = configuration
+        lastUpdatedConfiguration = configuration
+    }
+
+    func captureNextKeyPress(timeout: Duration) async -> HotkeyConfiguration? { nil }
 
     func send(_ event: HotkeyEvent) {
         continuation?.yield(event)
@@ -530,6 +540,55 @@ struct DictationPipelineTests {
         await simulateDictation(hotkey: hotkey)
 
         #expect(inserter.insertedText == "rohtext ohne korrektur")
+        #expect(pipeline.state == .idle)
+
+        tearDown(hotkey: hotkey, task: task)
+    }
+
+    @Test("updateHotkey forwards new configuration to HotkeyConfiguring dispatcher")
+    @MainActor
+    func updateHotkeyLiveRebind() async {
+        let hotkey = PipelineHotkeyMock()
+        let pipeline = makeSUT(hotkey: hotkey)
+
+        let newConfig = HotkeyConfiguration(keyCode: 0x38, modifierFlags: 0, requiresHold: true)
+        pipeline.updateHotkey(newConfig)
+
+        #expect(hotkey.lastUpdatedConfiguration == newConfig)
+        #expect(hotkey.currentConfiguration == newConfig)
+    }
+
+    @Test("all tasks disabled: LLM is skipped, raw text inserted, corrector.correct not called")
+    @MainActor
+    func allTasksOffSkipsLLM() async {
+        let hotkey = PipelineHotkeyMock()
+        let transcriber = PipelineTranscriberMock()
+        transcriber.resultText = "rohtext ohne llm"
+        let corrector = PipelineCorrectorMock()
+        let inserter = PipelineInserterMock()
+
+        let settings = makeTestSettings()
+        settings.correction.taskGrammar = false
+        settings.correction.taskFillerRemoval = false
+        settings.correction.taskWrittenLanguage = false
+        settings.correction.taskPunctuation = false
+        settings.correction.taskPreventHallucination = false
+
+        let pipeline = makeSUT(
+            hotkey: hotkey, transcriber: transcriber,
+            corrector: corrector, inserter: inserter,
+            settings: settings
+        )
+
+        var fallbackNotified = false
+        pipeline.onCorrectionFallback = { fallbackNotified = true }
+
+        let task = await activatePipeline(pipeline)
+        await simulateDictation(hotkey: hotkey)
+
+        #expect(corrector.correctCalled == false)
+        #expect(inserter.insertedText == "rohtext ohne llm")
+        #expect(fallbackNotified == false) // user-gewollter Skip, keine Notification
         #expect(pipeline.state == .idle)
 
         tearDown(hotkey: hotkey, task: task)

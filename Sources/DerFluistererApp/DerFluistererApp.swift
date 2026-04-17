@@ -29,8 +29,26 @@ struct DerFluistererApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        Settings {
-            MainWindowView(settings: appState.settings, historyVM: appState.historyVM, statisticsVM: appState.statisticsVM, updater: appState.updater)
+        Window("Einstellungen", id: "settings") {
+            MainWindowView(appState: appState, updater: appState.updater)
         }
+        .windowResizability(.contentMinSize)
+        .defaultSize(width: 600, height: 560)
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                SettingsOpenButton()
+            }
+        }
+    }
+}
+
+private struct SettingsOpenButton: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button("Einstellungen…") {
+            openWindow(id: "settings")
+        }
+        .keyboardShortcut(",", modifiers: .command)
     }
 }

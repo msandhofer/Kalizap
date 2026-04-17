@@ -209,6 +209,17 @@ public final class DictationPipeline {
         Task { await deps.recorder.stopRecording() }
     }
 
+    /// Live-Rebind des Hotkeys. Setzt die neue Konfiguration auf dem Dispatcher,
+    /// ohne den CGEventTap neu zu installieren. Greift sofort.
+    public func updateHotkey(_ configuration: HotkeyConfiguration) {
+        guard let configuring = deps.hotkey as? any HotkeyConfiguring else {
+            FileLog.log("updateHotkey — hotkey unterstuetzt kein HotkeyConfiguring, ignoriert")
+            return
+        }
+        configuring.updateConfiguration(configuration)
+        FileLog.log("updateHotkey — neuer Hotkey: keyCode=\(configuration.keyCode)")
+    }
+
     public func startDictation() async {
         await handleStart()
     }
@@ -462,8 +473,12 @@ public final class DictationPipeline {
             return
         }
 
-        // 3. Notify on correction fallback (API error, retry exhausted, etc.)
-        if case .fallbackRaw = correctionOutcome {
+        // 3. Notify on correction fallback — but not when the user deliberately
+        // disabled the LLM via tasks (that's not an error condition).
+        switch correctionOutcome {
+        case .fallbackRaw(_, .llmDisabled), .corrected:
+            break
+        case .fallbackRaw:
             onCorrectionFallback?()
         }
 
@@ -513,6 +528,10 @@ public final class DictationPipeline {
     }
 
     private func applyCorrection(_ job: DictationJob, transcription: TranscriptionResult) async -> CorrectionOutcome {
+        guard !job.correctionConfig.tasks.isEmpty else {
+            FileLog.log("process — LLM-Korrektur deaktiviert (keine Aufgaben aktiv), Rohtext wird eingefuegt")
+            return .fallbackRaw(text: transcription.text, reason: .llmDisabled)
+        }
         FileLog.log("process — correcting")
         updateStateIfNotRecording(.processing(stage: .correcting))
         let outcome = await deps.corrector.correct(transcription)

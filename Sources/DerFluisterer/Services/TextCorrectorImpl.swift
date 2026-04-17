@@ -91,29 +91,12 @@ public final class TextCorrectorImpl: TextCorrecting, @unchecked Sendable {
     }
 
     func buildSystemPrompt() -> String {
-        var parts: [String] = [
-            CorrectionPrompts.systemBase,
-            CorrectionPrompts.tasks,
-            CorrectionPrompts.Style.instruction(for: config.contextMode),
-        ]
-
-        if config.intensity.allowRephrasing {
-            parts.append(CorrectionPrompts.Intensity.rephrasing)
-        }
-        if config.intensity.allowShortening {
-            parts.append(CorrectionPrompts.Intensity.shortening)
-        }
-        if config.intensity.allowRestructuring {
-            parts.append(CorrectionPrompts.Intensity.restructuring)
-        }
-
-        if !config.personalDictionary.isEmpty {
-            parts.append(CorrectionPrompts.dictionaryInstruction(terms: config.personalDictionary))
-        }
-
-        parts.append(CorrectionPrompts.outputInstruction)
-
-        return parts.joined(separator: "\n")
+        CorrectionPrompts.buildSystemPrompt(
+            tasks: config.tasks,
+            contextMode: config.contextMode,
+            intensity: config.intensity,
+            personalDictionary: config.personalDictionary
+        )
     }
 }
 

@@ -10,6 +10,29 @@ final class SharedTypesTests: XCTestCase {
         XCTAssertFalse(intensity.allowRestructuring)
     }
 
+    func testCorrectionTasksDefaults() {
+        let tasks = CorrectionTasks()
+        XCTAssertTrue(tasks.grammar)
+        XCTAssertTrue(tasks.fillerRemoval)
+        XCTAssertTrue(tasks.writtenLanguage)
+        XCTAssertTrue(tasks.punctuation)
+        XCTAssertTrue(tasks.preventHallucination)
+        XCTAssertFalse(tasks.isEmpty)
+    }
+
+    func testCorrectionTasksIsEmpty() {
+        var tasks = CorrectionTasks(
+            grammar: false,
+            fillerRemoval: false,
+            writtenLanguage: false,
+            punctuation: false,
+            preventHallucination: false
+        )
+        XCTAssertTrue(tasks.isEmpty)
+        tasks.grammar = true
+        XCTAssertFalse(tasks.isEmpty)
+    }
+
     func testPipelineStateStartsIdle() {
         let state = PipelineState.idle
         XCTAssertEqual(state, .idle)

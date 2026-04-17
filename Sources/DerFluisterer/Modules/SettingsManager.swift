@@ -82,12 +82,34 @@ public struct CorrectionSettings: Codable, Equatable {
     public var personalDictionary: [String] = []
     public var llmTimeoutMs: Int = 800
     public var showAPIKeyNotification: Bool = true
+
+    public var taskGrammar: Bool = true
+    public var taskFillerRemoval: Bool = true
+    public var taskWrittenLanguage: Bool = true
+    public var taskPunctuation: Bool = true
+    public var taskPreventHallucination: Bool = true
+
     public static let defaultAppMapping: [String: ContextMode] = [
         "com.apple.mail": .formal,
         "com.tinyspeck.slackmacgap": .informal,
         "com.microsoft.Outlook": .formal
     ]
-    public init(contextMode: ContextMode = .neutral, appMapping: [String: ContextMode] = CorrectionSettings.defaultAppMapping, allowRephrasing: Bool = false, allowShortening: Bool = false, allowRestructuring: Bool = false, personalDictionary: [String] = [], llmTimeoutMs: Int = 800, showAPIKeyNotification: Bool = true) {
+
+    public init(
+        contextMode: ContextMode = .neutral,
+        appMapping: [String: ContextMode] = CorrectionSettings.defaultAppMapping,
+        allowRephrasing: Bool = false,
+        allowShortening: Bool = false,
+        allowRestructuring: Bool = false,
+        personalDictionary: [String] = [],
+        llmTimeoutMs: Int = 800,
+        showAPIKeyNotification: Bool = true,
+        taskGrammar: Bool = true,
+        taskFillerRemoval: Bool = true,
+        taskWrittenLanguage: Bool = true,
+        taskPunctuation: Bool = true,
+        taskPreventHallucination: Bool = true
+    ) {
         self.contextMode = contextMode
         self.appMapping = appMapping
         self.allowRephrasing = allowRephrasing
@@ -96,6 +118,42 @@ public struct CorrectionSettings: Codable, Equatable {
         self.personalDictionary = personalDictionary
         self.llmTimeoutMs = llmTimeoutMs
         self.showAPIKeyNotification = showAPIKeyNotification
+        self.taskGrammar = taskGrammar
+        self.taskFillerRemoval = taskFillerRemoval
+        self.taskWrittenLanguage = taskWrittenLanguage
+        self.taskPunctuation = taskPunctuation
+        self.taskPreventHallucination = taskPreventHallucination
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        contextMode = try container.decodeIfPresent(ContextMode.self, forKey: .contextMode) ?? .neutral
+        appMapping = try container.decodeIfPresent([String: ContextMode].self, forKey: .appMapping) ?? CorrectionSettings.defaultAppMapping
+        allowRephrasing = try container.decodeIfPresent(Bool.self, forKey: .allowRephrasing) ?? false
+        allowShortening = try container.decodeIfPresent(Bool.self, forKey: .allowShortening) ?? false
+        allowRestructuring = try container.decodeIfPresent(Bool.self, forKey: .allowRestructuring) ?? false
+        personalDictionary = try container.decodeIfPresent([String].self, forKey: .personalDictionary) ?? []
+        llmTimeoutMs = try container.decodeIfPresent(Int.self, forKey: .llmTimeoutMs) ?? 800
+        showAPIKeyNotification = try container.decodeIfPresent(Bool.self, forKey: .showAPIKeyNotification) ?? true
+        taskGrammar = try container.decodeIfPresent(Bool.self, forKey: .taskGrammar) ?? true
+        taskFillerRemoval = try container.decodeIfPresent(Bool.self, forKey: .taskFillerRemoval) ?? true
+        taskWrittenLanguage = try container.decodeIfPresent(Bool.self, forKey: .taskWrittenLanguage) ?? true
+        taskPunctuation = try container.decodeIfPresent(Bool.self, forKey: .taskPunctuation) ?? true
+        taskPreventHallucination = try container.decodeIfPresent(Bool.self, forKey: .taskPreventHallucination) ?? true
+    }
+
+    public var isLLMEnabled: Bool {
+        taskGrammar || taskFillerRemoval || taskWrittenLanguage || taskPunctuation || taskPreventHallucination
+    }
+
+    public var tasks: CorrectionTasks {
+        CorrectionTasks(
+            grammar: taskGrammar,
+            fillerRemoval: taskFillerRemoval,
+            writtenLanguage: taskWrittenLanguage,
+            punctuation: taskPunctuation,
+            preventHallucination: taskPreventHallucination
+        )
     }
 }
 
