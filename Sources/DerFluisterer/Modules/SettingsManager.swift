@@ -80,7 +80,7 @@ public struct CorrectionSettings: Codable, Equatable {
     public var allowShortening: Bool = false
     public var allowRestructuring: Bool = false
     public var personalDictionary: [String] = []
-    public var llmTimeoutMs: Int = 800
+    public var llmTimeoutMs: Int = AppConstants.defaultLLMTimeoutMs
     public var showAPIKeyNotification: Bool = true
 
     public var taskGrammar: Bool = true
@@ -102,7 +102,7 @@ public struct CorrectionSettings: Codable, Equatable {
         allowShortening: Bool = false,
         allowRestructuring: Bool = false,
         personalDictionary: [String] = [],
-        llmTimeoutMs: Int = 800,
+        llmTimeoutMs: Int = AppConstants.defaultLLMTimeoutMs,
         showAPIKeyNotification: Bool = true,
         taskGrammar: Bool = true,
         taskFillerRemoval: Bool = true,
@@ -133,7 +133,7 @@ public struct CorrectionSettings: Codable, Equatable {
         allowShortening = try container.decodeIfPresent(Bool.self, forKey: .allowShortening) ?? false
         allowRestructuring = try container.decodeIfPresent(Bool.self, forKey: .allowRestructuring) ?? false
         personalDictionary = try container.decodeIfPresent([String].self, forKey: .personalDictionary) ?? []
-        llmTimeoutMs = try container.decodeIfPresent(Int.self, forKey: .llmTimeoutMs) ?? 800
+        llmTimeoutMs = try container.decodeIfPresent(Int.self, forKey: .llmTimeoutMs) ?? AppConstants.defaultLLMTimeoutMs
         showAPIKeyNotification = try container.decodeIfPresent(Bool.self, forKey: .showAPIKeyNotification) ?? true
         taskGrammar = try container.decodeIfPresent(Bool.self, forKey: .taskGrammar) ?? true
         taskFillerRemoval = try container.decodeIfPresent(Bool.self, forKey: .taskFillerRemoval) ?? true

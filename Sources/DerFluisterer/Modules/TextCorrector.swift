@@ -5,7 +5,7 @@ public struct CorrectionConfig: Sendable {
     public var tasks: CorrectionTasks = .init()
     public var intensity: CorrectionIntensity = .init()
     public var personalDictionary: [String] = []
-    public var timeoutMs: Int = 800
+    public var timeoutMs: Int = AppConstants.defaultLLMTimeoutMs
     public var maxRetries: Int = 1
 
     public init(
@@ -13,7 +13,7 @@ public struct CorrectionConfig: Sendable {
         tasks: CorrectionTasks = .init(),
         intensity: CorrectionIntensity = .init(),
         personalDictionary: [String] = [],
-        timeoutMs: Int = 800,
+        timeoutMs: Int = AppConstants.defaultLLMTimeoutMs,
         maxRetries: Int = 1
     ) {
         self.contextMode = contextMode
@@ -39,12 +39,10 @@ public struct CorrectionConfig: Sendable {
 
 public struct CorrectionStats: Sendable {
     public let latencyMs: Int
-    public let tokensUsed: Int
     public let wasRetry: Bool
 
-    public init(latencyMs: Int, tokensUsed: Int, wasRetry: Bool) {
+    public init(latencyMs: Int, wasRetry: Bool) {
         self.latencyMs = latencyMs
-        self.tokensUsed = tokensUsed
         self.wasRetry = wasRetry
     }
 }

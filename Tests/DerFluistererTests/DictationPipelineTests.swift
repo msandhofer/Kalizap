@@ -140,7 +140,7 @@ final class PipelineCorrectorMock: TextCorrecting, @unchecked Sendable {
         }
         return .corrected(
             text: correctedText,
-            stats: CorrectionStats(latencyMs: 50, tokensUsed: 10, wasRetry: false)
+            stats: CorrectionStats(latencyMs: 50, wasRetry: false)
         )
     }
 

@@ -141,7 +141,7 @@ public final class DictationPipeline {
     public private(set) var streamingText: String = ""
     private var streamingFinalTranscription: FinalTranscription?
     public private(set) var audioLevel: Float = 0
-    public private(set) var spectrumBands: [Float] = Array(repeating: 0, count: 20)
+    public private(set) var spectrumBands: [Float] = Array(repeating: 0, count: AudioSpectrumCalculator.bandCount)
 
     /// Called when correction falls back to raw text due to API error (e.g. missing/invalid key).
     public var onCorrectionFallback: (() -> Void)?
@@ -278,7 +278,7 @@ public final class DictationPipeline {
         levelTask = nil
         deps.spectrumProvider.setSpectrumHandler(nil)
         audioLevel = 0
-        spectrumBands = Array(repeating: 0, count: 20)
+        spectrumBands = Array(repeating: 0, count: AudioSpectrumCalculator.bandCount)
         deps.overlayPresenter?.hide()
     }
 
@@ -327,7 +327,7 @@ public final class DictationPipeline {
         levelTask = nil
         deps.spectrumProvider.setSpectrumHandler(nil)
         audioLevel = 0
-        spectrumBands = Array(repeating: 0, count: 20)
+        spectrumBands = Array(repeating: 0, count: AudioSpectrumCalculator.bandCount)
         deps.overlayPresenter?.hide()
     }
 
@@ -595,8 +595,6 @@ public final class DictationPipeline {
             insertionMs: timings.insertionMs,
             usedStreamingResult: timings.usedStreamingResult,
             audioSampleCount: timings.audioSampleCount,
-            whisperModel: nil,
-            whisperEngine: nil,
             stopSoundMs: timings.stopSoundMs,
             recorderStopMs: timings.recorderStopMs,
             streamingWaitMs: timings.streamingWaitMs

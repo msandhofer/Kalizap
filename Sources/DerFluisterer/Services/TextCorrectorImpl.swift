@@ -38,7 +38,6 @@ public final class TextCorrectorImpl: TextCorrecting, @unchecked Sendable {
                 let elapsed = ContinuousClock.now - start
                 let stats = CorrectionStats(
                     latencyMs: Int(elapsed.components.seconds * 1000 + elapsed.components.attoseconds / 1_000_000_000_000_000),
-                    tokensUsed: 0,
                     wasRetry: attempt > 1
                 )
                 let outcome = CorrectionOutcome.corrected(text: correctedText, stats: stats)

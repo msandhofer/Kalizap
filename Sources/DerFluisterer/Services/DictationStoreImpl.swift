@@ -49,8 +49,6 @@ public actor DictationStoreImpl: DictationStoring {
             insertionMs: entry.insertionMs,
             usedStreamingResult: entry.usedStreamingResult,
             audioSampleCount: entry.audioSampleCount,
-            whisperModel: entry.whisperModel,
-            whisperEngine: entry.whisperEngine,
             stopSoundMs: entry.stopSoundMs,
             recorderStopMs: entry.recorderStopMs,
             streamingWaitMs: entry.streamingWaitMs

@@ -12,7 +12,10 @@ struct DerFluistererApp: App {
             apiKeyValidator: AnthropicAPIKeyValidator(),
             launchAtLogin: LaunchAtLoginService()
         )
-        let container = try! ModelContainer(for: DictationRecord.self)
+        let container = try! ModelContainer(
+            for: DictationRecord.self,
+            migrationPlan: DictationMigrationPlan.self
+        )
         let store: any DictationStoring = DictationStoreImpl(modelContainer: container)
         _appState = State(initialValue: AppState(settings: settings, store: store))
         FileLog.log("App.init completed — language=\(settings.audio.language.rawValue)")
