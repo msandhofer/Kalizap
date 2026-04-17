@@ -58,7 +58,7 @@ struct MenuBarView: View {
                 ModelLoadingView(progress: progress)
 
             case .recording:
-                RecordingStatusView(audioLevel: pipeline.audioLevel)
+                RecordingStatusView(bands: pipeline.spectrumBands)
 
             case .processing(let stage):
                 ProcessingStatusView(stage: stage, onCancel: pipeline.cancelDictation)
@@ -169,10 +169,10 @@ private struct ModelLoadingView: View {
 }
 
 private struct RecordingStatusView: View {
-    let audioLevel: Float
+    let bands: [Float]
 
     var body: some View {
-        WaveformView(levels: [audioLevel])
+        SpectrumView(bands: bands, barCount: 12, height: 20, barWidth: 2, spacing: 2)
             .padding(.horizontal, 8)
         Text("Aufnahme läuft…")
             .font(.caption)

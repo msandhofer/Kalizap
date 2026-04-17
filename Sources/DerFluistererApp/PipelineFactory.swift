@@ -30,6 +30,8 @@ enum PipelineFactory {
             hotkey: hotkey,
             recorder: recorder,
             metering: recorder,
+            spectrumProvider: recorder,
+            overlayPresenter: SpectrumOverlayWindow.shared,
             transcriber: transcriber,
             corrector: corrector,
             inserter: inserter,

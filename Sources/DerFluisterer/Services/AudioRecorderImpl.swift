@@ -2,6 +2,27 @@ import Foundation
 @preconcurrency import AVFoundation
 import AudioToolbox
 
+/// Thread-safe holder for the spectrum handler closure.
+/// Lives as a standalone reference type so the `onSpectrum` callback
+/// can capture it without needing a fully-initialized `AudioRecorderImpl`.
+private final class SpectrumHandlerBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var handler: (@Sendable ([Float]) -> Void)?
+
+    func set(_ handler: (@Sendable ([Float]) -> Void)?) {
+        lock.lock()
+        self.handler = handler
+        lock.unlock()
+    }
+
+    func dispatch(_ bands: [Float]) {
+        lock.lock()
+        let h = handler
+        lock.unlock()
+        h?(bands)
+    }
+}
+
 public final class AudioRecorderImpl: AudioRecording, @unchecked Sendable {
     private let coordinator: AudioSessionCoordinator
     private let deviceManager: AudioDeviceManager
@@ -22,6 +43,14 @@ public final class AudioRecorderImpl: AudioRecording, @unchecked Sendable {
 
     public let levelStream: AsyncStream<AudioLevel>
 
+    // MARK: - AudioSpectrumProviding
+
+    private let spectrumHandlerBox = SpectrumHandlerBox()
+
+    public func setSpectrumHandler(_ handler: (@Sendable ([Float]) -> Void)?) {
+        spectrumHandlerBox.set(handler)
+    }
+
     // MARK: - AudioDeviceManaging
 
     public let availableDevices: AsyncStream<[AudioDevice]>
@@ -41,9 +70,20 @@ public final class AudioRecorderImpl: AudioRecording, @unchecked Sendable {
         self.availableDevices = AsyncStream { devicesCont = $0 }
         self.devicesContinuation = devicesCont
 
-        let adapter = AudioQueueAdapter(sampleRate: AudioProcessingUtils.transcriptionSampleRate, noiseSuppressor: noiseSuppressor) { level in
-            levelCont?.yield(level)
-        }
+        let spectrumCalculator = AudioSpectrumCalculator()
+        let handlerBox = self.spectrumHandlerBox
+
+        let adapter = AudioQueueAdapter(
+            sampleRate: AudioProcessingUtils.transcriptionSampleRate,
+            noiseSuppressor: noiseSuppressor,
+            spectrumCalculator: spectrumCalculator,
+            onLevel: { level in
+                levelCont?.yield(level)
+            },
+            onSpectrum: { bands in
+                handlerBox.dispatch(bands)
+            }
+        )
         self.coordinator = AudioSessionCoordinator(engine: adapter)
     }
 
@@ -86,17 +126,27 @@ public final class AudioRecorderImpl: AudioRecording, @unchecked Sendable {
 final class AudioQueueAdapter: AudioEngineProviding, @unchecked Sendable {
     private let outputSampleRate: Int
     private let noiseSuppressor: DeepFilterProcessor?
+    private let spectrumCalculator: AudioSpectrumCalculator
     private let onLevel: (AudioLevel) -> Void
+    private let onSpectrum: ([Float]) -> Void
     private var continuation: AsyncThrowingStream<AudioChunk, Error>.Continuation?
     private var chunkTimestamp: TimeInterval = 0
     private var audioQueue: AudioQueueRef?
     private let numBuffers = 3
     private let bufferByteSize: UInt32 = 16384
 
-    init(sampleRate: Int, noiseSuppressor: DeepFilterProcessor? = nil, onLevel: @escaping (AudioLevel) -> Void) {
+    init(
+        sampleRate: Int,
+        noiseSuppressor: DeepFilterProcessor? = nil,
+        spectrumCalculator: AudioSpectrumCalculator,
+        onLevel: @escaping (AudioLevel) -> Void,
+        onSpectrum: @escaping ([Float]) -> Void
+    ) {
         self.outputSampleRate = sampleRate
         self.noiseSuppressor = noiseSuppressor
+        self.spectrumCalculator = spectrumCalculator
         self.onLevel = onLevel
+        self.onSpectrum = onSpectrum
     }
 
     var audioStream: AsyncThrowingStream<AudioChunk, Error> {
@@ -185,6 +235,8 @@ final class AudioQueueAdapter: AudioEngineProviding, @unchecked Sendable {
 
         let chunk = makeChunk(from: samples)
         onLevel(chunk.level)
+        let bands = spectrumCalculator.calculate(from: samples, sampleRate: outputSampleRate)
+        onSpectrum(bands)
         continuation?.yield(chunk)
 
         if let queue = audioQueue {

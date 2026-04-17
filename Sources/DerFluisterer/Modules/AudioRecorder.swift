@@ -64,6 +64,12 @@ public protocol AudioLevelMetering: AnyObject, Sendable {
     func stopMetering() async
 }
 
+public protocol AudioSpectrumProviding: AnyObject, Sendable {
+    /// Register a handler to receive 20 normalized frequency band values [0, 1].
+    /// Called from an audio-processing thread. Pass `nil` to remove the handler.
+    func setSpectrumHandler(_ handler: (@Sendable ([Float]) -> Void)?)
+}
+
 public protocol AudioDeviceManaging: AnyObject, Sendable {
     var availableDevices: AsyncStream<[AudioDevice]> { get }
     var selectedDevice: AudioDevice? { get }
@@ -71,4 +77,4 @@ public protocol AudioDeviceManaging: AnyObject, Sendable {
     func selectDefaultDevice() async throws
 }
 
-public protocol AudioRecording: AudioCapturing, AudioLevelMetering, AudioDeviceManaging {}
+public protocol AudioRecording: AudioCapturing, AudioLevelMetering, AudioSpectrumProviding, AudioDeviceManaging {}

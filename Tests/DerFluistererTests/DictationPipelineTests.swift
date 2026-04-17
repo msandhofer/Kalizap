@@ -335,6 +335,7 @@ struct DictationPipelineTests {
             hotkey: hotkey,
             recorder: recorder,
             metering: metering,
+            spectrumProvider: MockAudioSpectrumProvider(),
             transcriber: transcriber,
             corrector: corrector,
             inserter: inserter,

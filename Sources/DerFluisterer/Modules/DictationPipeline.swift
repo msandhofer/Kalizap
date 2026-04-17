@@ -10,6 +10,15 @@ extension Duration {
 
 private let logger = Logger(subsystem: "com.derfluesterer", category: "Pipeline")
 
+/// Kleines Kontrakt für einen Overlay-Presenter, den die Pipeline beim
+/// Aufnahme-Start öffnet und beim Stop schließt. Implementierung lebt in
+/// der App-Schicht (NSPanel).
+@MainActor
+public protocol SpectrumOverlayPresenting: AnyObject {
+    func show(pipeline: DictationPipeline)
+    func hide()
+}
+
 /// File logger controlled by --verbose-log launch argument.
 public enum FileLog {
     public static let enabled = CommandLine.arguments.contains("--verbose-log")
@@ -61,6 +70,8 @@ public struct PipelineDependencies {
     public let hotkey: any HotkeyMonitoring
     public let recorder: any AudioCapturing
     public let metering: any AudioLevelMetering
+    public let spectrumProvider: any AudioSpectrumProviding
+    public let overlayPresenter: (any SpectrumOverlayPresenting)?
     public let transcriber: any TranscriptionEngine
     public let corrector: any TextCorrecting
     public let inserter: any TextInserting
@@ -73,6 +84,8 @@ public struct PipelineDependencies {
         hotkey: any HotkeyMonitoring,
         recorder: any AudioCapturing,
         metering: any AudioLevelMetering,
+        spectrumProvider: any AudioSpectrumProviding,
+        overlayPresenter: (any SpectrumOverlayPresenting)? = nil,
         transcriber: any TranscriptionEngine,
         corrector: any TextCorrecting,
         inserter: any TextInserting,
@@ -84,6 +97,8 @@ public struct PipelineDependencies {
         self.hotkey = hotkey
         self.recorder = recorder
         self.metering = metering
+        self.spectrumProvider = spectrumProvider
+        self.overlayPresenter = overlayPresenter
         self.transcriber = transcriber
         self.corrector = corrector
         self.inserter = inserter
@@ -126,6 +141,7 @@ public final class DictationPipeline {
     public private(set) var streamingText: String = ""
     private var streamingFinalTranscription: FinalTranscription?
     public private(set) var audioLevel: Float = 0
+    public private(set) var spectrumBands: [Float] = Array(repeating: 0, count: 20)
 
     /// Called when correction falls back to raw text due to API error (e.g. missing/invalid key).
     public var onCorrectionFallback: (() -> Void)?
@@ -260,7 +276,10 @@ public final class DictationPipeline {
         streamingTask = nil
         levelTask?.cancel()
         levelTask = nil
+        deps.spectrumProvider.setSpectrumHandler(nil)
         audioLevel = 0
+        spectrumBands = Array(repeating: 0, count: 20)
+        deps.overlayPresenter?.hide()
     }
 
     private func handleStart() async {
@@ -279,6 +298,12 @@ public final class DictationPipeline {
             FileLog.log("handleStart — recorder started, starting audio processing + metering")
             startAudioProcessing()
             startLevelMetering()
+            deps.spectrumProvider.setSpectrumHandler { [weak self] bands in
+                Task { @MainActor in
+                    self?.spectrumBands = bands
+                }
+            }
+            deps.overlayPresenter?.show(pipeline: self)
             FileLog.log("handleStart — done")
         } catch {
             FileLog.log("handleStart — ERROR: \(error)")
@@ -300,7 +325,10 @@ public final class DictationPipeline {
     private func stopLevelMetering() {
         levelTask?.cancel()
         levelTask = nil
+        deps.spectrumProvider.setSpectrumHandler(nil)
         audioLevel = 0
+        spectrumBands = Array(repeating: 0, count: 20)
+        deps.overlayPresenter?.hide()
     }
 
     private func handleStop() async {

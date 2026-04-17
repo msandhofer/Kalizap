@@ -75,6 +75,24 @@ final class MockAccessibilityInserter: AccessibilityInserting, @unchecked Sendab
     }
 }
 
+final class MockAudioSpectrumProvider: AudioSpectrumProviding, @unchecked Sendable {
+    private let lock = NSLock()
+    private var handler: (@Sendable ([Float]) -> Void)?
+
+    func setSpectrumHandler(_ handler: (@Sendable ([Float]) -> Void)?) {
+        lock.lock()
+        self.handler = handler
+        lock.unlock()
+    }
+
+    func emit(_ bands: [Float]) {
+        lock.lock()
+        let h = handler
+        lock.unlock()
+        h?(bands)
+    }
+}
+
 final class MockAppDetector: ActiveAppDetecting, @unchecked Sendable {
     var app: ActiveApp?
 
