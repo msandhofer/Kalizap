@@ -8,3 +8,4 @@ DerivedData/
 *.o
 *.swp
 *~
+.superpowers/
