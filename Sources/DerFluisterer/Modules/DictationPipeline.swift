@@ -274,6 +274,14 @@ public final class DictationPipeline {
     private func stopStreamingAndMetering() {
         streamingTask?.cancel()
         streamingTask = nil
+        cleanupLevelAndSpectrum()
+    }
+
+    /// Beendet Level-Metering, entfernt den Spectrum-Handler, resettet die UI-Werte
+    /// und schließt das Overlay. Shared von `stopStreamingAndMetering` (Shutdown-Path)
+    /// und `handleStop` (Normal-Stop-Path) — Unterschied der beiden Paths liegt nur
+    /// im Streaming-Task-Handling.
+    private func cleanupLevelAndSpectrum() {
         levelTask?.cancel()
         levelTask = nil
         deps.spectrumProvider.setSpectrumHandler(nil)
@@ -322,22 +330,13 @@ public final class DictationPipeline {
         }
     }
 
-    private func stopLevelMetering() {
-        levelTask?.cancel()
-        levelTask = nil
-        deps.spectrumProvider.setSpectrumHandler(nil)
-        audioLevel = 0
-        spectrumBands = Array(repeating: 0, count: AudioSpectrumCalculator.bandCount)
-        deps.overlayPresenter?.hide()
-    }
-
     private func handleStop() async {
         FileLog.log("handleStop — begin, isRecording=\(isRecording)")
         recordingWatchdog?.cancel()
         let stopTimestamp = ContinuousClock.now
         isRecording = false
 
-        stopLevelMetering()
+        cleanupLevelAndSpectrum()
 
         let tSound = ContinuousClock.now
         await deps.sound.playStopSound()

@@ -158,10 +158,7 @@ public final class SpeechAnalyzerTranscriptionEngine: TranscriptionEngine, @unch
                 }
 
                 // Wait for result consumer to finish
-                guard let (finalText, elapsed) = try? await resultTask.value else {
-                    FileLog.log("SpeechAnalyzer — resultTask failed")
-                    return
-                }
+                let (finalText, elapsed) = await resultTask.value
                 guard !Task.isCancelled, !finalText.isEmpty else {
                     FileLog.log("SpeechAnalyzer — cancelled or empty after results")
                     return
