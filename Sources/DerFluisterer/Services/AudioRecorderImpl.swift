@@ -134,6 +134,9 @@ final class AudioQueueAdapter: AudioEngineProviding, @unchecked Sendable {
     private var audioQueue: AudioQueueRef?
     private let numBuffers = 3
     private let bufferByteSize: UInt32 = 16384
+    // Timing instrumentation for #42.
+    private var captureStartTime: ContinuousClock.Instant?
+    private var firstBufferLogged: Bool = false
 
     init(
         sampleRate: Int,
@@ -156,6 +159,10 @@ final class AudioQueueAdapter: AudioEngineProviding, @unchecked Sendable {
     }
 
     func startCapture() throws {
+        let tStart = ContinuousClock.now
+        captureStartTime = tStart
+        firstBufferLogged = false
+
         // Capture at 48kHz when noise suppression is active (DeepFilterNet3 requires it),
         // otherwise capture directly at the output sample rate (16kHz).
         let captureSampleRate = noiseSuppressor != nil ? noiseSuppressor!.inputSampleRate : outputSampleRate
@@ -205,6 +212,7 @@ final class AudioQueueAdapter: AudioEngineProviding, @unchecked Sendable {
             AudioQueueEnqueueBuffer(queue, buf, 0, nil)
         }
 
+        let tQueueStart = ContinuousClock.now
         let startStatus = AudioQueueStart(queue, nil)
         guard startStatus == noErr else {
             throw AudioRecorderError.engineSetupFailed(
@@ -212,6 +220,7 @@ final class AudioQueueAdapter: AudioEngineProviding, @unchecked Sendable {
                                     userInfo: [NSLocalizedDescriptionKey: "AudioQueueStart failed (\(startStatus))"])
             )
         }
+        FileLog.log("TIMING AudioQueueAdapter — startCapture total: \(tStart.millisecondsSinceNow())ms (AudioQueueStart: \(tQueueStart.millisecondsSinceNow())ms)")
     }
 
     func stopCapture() {
@@ -226,6 +235,11 @@ final class AudioQueueAdapter: AudioEngineProviding, @unchecked Sendable {
     fileprivate func handleBuffer(_ buffer: AudioQueueBufferRef) {
         let count = Int(buffer.pointee.mAudioDataByteSize) / MemoryLayout<Float>.size
         guard count > 0 else { return }
+
+        if !firstBufferLogged, let t0 = captureStartTime {
+            firstBufferLogged = true
+            FileLog.log("TIMING AudioQueueAdapter — FIRST buffer callback: \(t0.millisecondsSinceNow())ms after startCapture")
+        }
 
         let ptr = buffer.pointee.mAudioData.assumingMemoryBound(to: Float.self)
         let rawSamples = Array(UnsafeBufferPointer(start: ptr, count: count))

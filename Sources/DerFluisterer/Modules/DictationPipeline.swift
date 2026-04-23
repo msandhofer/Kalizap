@@ -2,7 +2,7 @@ import Foundation
 import os.log
 
 extension Duration {
-    var millisInt: Int {
+    public var millisInt: Int {
         let (seconds, attoseconds) = components
         return Int(seconds * 1000) + Int(Double(attoseconds) / 1e15)
     }
@@ -60,7 +60,7 @@ public final class FileAppender: @unchecked Sendable {
 }
 
 extension ContinuousClock.Instant {
-    func millisecondsSinceNow() -> Int {
+    public func millisecondsSinceNow() -> Int {
         let elapsed = ContinuousClock.now - self
         return Int(elapsed.components.seconds * 1000 + elapsed.components.attoseconds / 1_000_000_000_000_000)
     }
@@ -78,7 +78,9 @@ public struct PipelineDependencies {
     public let appDetector: any ActiveAppDetecting
     public let store: any DictationStoring
     public let sound: any SoundPlaying
+    public let audioMonitor: any AudioActivityMonitoring
     public let settings: SettingsManager
+    public let recordingTailDuration: Duration
 
     public init(
         hotkey: any HotkeyMonitoring,
@@ -92,7 +94,9 @@ public struct PipelineDependencies {
         appDetector: any ActiveAppDetecting,
         store: any DictationStoring,
         sound: any SoundPlaying,
-        settings: SettingsManager
+        audioMonitor: any AudioActivityMonitoring,
+        settings: SettingsManager,
+        recordingTailDuration: Duration = AppConstants.recordingTailDuration
     ) {
         self.hotkey = hotkey
         self.recorder = recorder
@@ -105,7 +109,9 @@ public struct PipelineDependencies {
         self.appDetector = appDetector
         self.store = store
         self.sound = sound
+        self.audioMonitor = audioMonitor
         self.settings = settings
+        self.recordingTailDuration = recordingTailDuration
     }
 }
 
@@ -156,6 +162,9 @@ public final class DictationPipeline {
     private var levelTask: Task<Void, Never>?
     private var recordingWatchdog: Task<Void, Never>?
     private var collectedChunks: [AudioChunk] = []
+    // Timing instrumentation for #42: cold-start delay diagnosis.
+    private var handleStartBeginTime: ContinuousClock.Instant?
+    private var firstSpectrumLogged: Bool = false
 
     public init(dependencies: PipelineDependencies) {
         self.deps = dependencies
@@ -291,7 +300,10 @@ public final class DictationPipeline {
     }
 
     private func handleStart() async {
-        FileLog.log("handleStart — begin")
+        let tStart = ContinuousClock.now
+        handleStartBeginTime = tStart
+        firstSpectrumLogged = false
+        FileLog.log("TIMING handleStart — begin")
         cancelled = false
         isRecording = true
         streamingText = ""
@@ -299,20 +311,50 @@ public final class DictationPipeline {
         collectedChunks = []
         state = .recording
         startRecordingWatchdog()
-        await deps.sound.playStartSound()
+
+        // Skip the start sound when system audio is cold — playing it would block
+        // handleStart for ~1.5s waiting for CoreAudio output wakeup. Instead, kick
+        // off a silent prewarm in the background so the next press is fast.
+        // See docs/audio-cold-start/ for the analysis.
+        let audioWarm = deps.audioMonitor.isAudioWarm()
+        let tSound = ContinuousClock.now
+        if audioWarm {
+            await deps.sound.playStartSound()
+            FileLog.log("TIMING handleStart — playStartSound: \(tSound.millisecondsSinceNow())ms")
+        } else {
+            FileLog.log("handleStart — audio cold, skipping start sound + priming in background")
+            Task.detached { [sound = deps.sound] in
+                await sound.prewarm()
+            }
+        }
+
         do {
             FileLog.log("handleStart — calling recorder.startRecording")
+            let tRec = ContinuousClock.now
             try await deps.recorder.startRecording()
+            FileLog.log("TIMING handleStart — recorder.startRecording: \(tRec.millisecondsSinceNow())ms")
+
             FileLog.log("handleStart — recorder started, starting audio processing + metering")
             startAudioProcessing()
             startLevelMetering()
             deps.spectrumProvider.setSpectrumHandler { [weak self] bands in
                 Task { @MainActor in
-                    self?.spectrumBands = bands
+                    guard let self else { return }
+                    self.spectrumBands = bands
+                    if !self.firstSpectrumLogged {
+                        self.firstSpectrumLogged = true
+                        if let t0 = self.handleStartBeginTime {
+                            FileLog.log("TIMING handleStart — FIRST spectrumBands: \(t0.millisecondsSinceNow())ms from handleStart-begin")
+                        }
+                    }
                 }
             }
+
+            let tShow = ContinuousClock.now
             deps.overlayPresenter?.show(pipeline: self)
-            FileLog.log("handleStart — done")
+            FileLog.log("TIMING handleStart — overlay.show: \(tShow.millisecondsSinceNow())ms")
+
+            FileLog.log("TIMING handleStart — done, TOTAL: \(tStart.millisecondsSinceNow())ms")
         } catch {
             FileLog.log("handleStart — ERROR: \(error)")
             isRecording = false
@@ -342,10 +384,18 @@ public final class DictationPipeline {
         await deps.sound.playStopSound()
         let stopSoundMs = (ContinuousClock.now - tSound).millisInt
 
+        // Tail-recording: keep the recorder running for a short window after
+        // keyup so the user's last word isn't truncated by an eager key release.
+        // Overlay and stop-sound have already fired, so UX latency is unaffected.
+        let tailDuration = deps.recordingTailDuration
+        if tailDuration > .zero {
+            try? await Task.sleep(for: tailDuration)
+        }
+
         let tRecorder = ContinuousClock.now
         await deps.recorder.stopRecording()
         let recorderStopMs = (ContinuousClock.now - tRecorder).millisInt
-        FileLog.log("handleStop — recorder stopped in \(recorderStopMs)ms, waiting for streaming final decode")
+        FileLog.log("handleStop — recorder stopped in \(recorderStopMs)ms (after \(tailDuration.millisInt)ms tail), waiting for streaming final decode")
 
         let tStreaming = ContinuousClock.now
         await streamingTask?.value

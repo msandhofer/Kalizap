@@ -7,6 +7,8 @@ public enum SoundEffect: Sendable, Equatable {
 
 public protocol SoundBackend: Sendable {
     func play(_ sound: SoundEffect)
+    /// Play the start-sound silently (volume 0) to warm up the CoreAudio output path.
+    func prewarm()
 }
 
 public final class SoundPlayer: SoundPlaying, @unchecked Sendable {
@@ -33,6 +35,13 @@ public final class SoundPlayer: SoundPlaying, @unchecked Sendable {
     public func playStopSound() async {
         guard isEnabled() else { return }
         backend.play(.recordingStopped)
+    }
+
+    public func prewarm() async {
+        // Prewarm is intentionally unconditional of isEnabled: its purpose is to
+        // warm the CoreAudio output path so the next real play is fast. The user
+        // hears nothing (volume 0).
+        backend.prewarm()
     }
 
     // MARK: - Synchronous (used by RecordingCoordinator)

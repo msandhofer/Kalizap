@@ -42,4 +42,15 @@ struct SoundPlayerTests {
         player.playRecordingStarted()
         #expect(backend.playedSounds == [.recordingStarted])
     }
+
+    @Test("prewarm forwards to backend regardless of isEnabled")
+    func prewarmAlwaysForwards() async {
+        let backend = MockSoundBackend()
+        // Even with sounds disabled, prewarm must still run — its purpose is to
+        // warm CoreAudio, not to produce audible output.
+        let player = SoundPlayer(backend: backend, soundsEnabled: false)
+        await player.prewarm()
+        #expect(backend.prewarmCallCount == 1)
+        #expect(backend.playedSounds.isEmpty)
+    }
 }

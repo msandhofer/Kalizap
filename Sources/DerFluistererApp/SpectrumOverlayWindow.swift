@@ -14,16 +14,20 @@ final class SpectrumOverlayWindow: SpectrumOverlayPresenting {
     private init() {}
 
     func show(pipeline: DictationPipeline) {
+        let tStart = ContinuousClock.now
         if let existing = window {
             existing.close()
             window = nil
         }
         guard let screen = NSScreen.main else { return }
 
+        let tHost = ContinuousClock.now
         let content = SpectrumOverlayContent(pipeline: pipeline)
         let hostingView = NSHostingView(rootView: content)
         hostingView.frame.size = hostingView.fittingSize
+        FileLog.log("TIMING SpectrumOverlay — NSHostingView build: \(tHost.millisecondsSinceNow())ms")
 
+        let tPanel = ContinuousClock.now
         let panel = NSPanel(
             contentRect: NSRect(origin: .zero, size: hostingView.fittingSize),
             styleMask: [.nonactivatingPanel, .fullSizeContentView],
@@ -46,12 +50,14 @@ final class SpectrumOverlayWindow: SpectrumOverlayPresenting {
 
         panel.alphaValue = 0
         panel.orderFrontRegardless()
+        FileLog.log("TIMING SpectrumOverlay — NSPanel build+order: \(tPanel.millisecondsSinceNow())ms")
         self.window = panel
 
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.2
             panel.animator().alphaValue = 1
         }
+        FileLog.log("TIMING SpectrumOverlay — show total: \(tStart.millisecondsSinceNow())ms")
     }
 
     func hide() {

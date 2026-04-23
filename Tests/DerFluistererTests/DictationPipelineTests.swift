@@ -79,6 +79,7 @@ final class PipelineRecorderMock: AudioCapturing, @unchecked Sendable {
 final class PipelineSoundMock: SoundPlaying, @unchecked Sendable {
     var startPlayed = false
     var stopPlayed = false
+    var prewarmed = false
 
     func playStartSound() async {
         startPlayed = true
@@ -86,6 +87,10 @@ final class PipelineSoundMock: SoundPlaying, @unchecked Sendable {
 
     func playStopSound() async {
         stopPlayed = true
+    }
+
+    func prewarm() async {
+        prewarmed = true
     }
 }
 
@@ -321,6 +326,7 @@ struct DictationPipelineTests {
         recorder: PipelineRecorderMock = PipelineRecorderMock(),
         metering: any AudioLevelMetering = PipelineLevelMeteringMock(),
         sound: PipelineSoundMock = PipelineSoundMock(),
+        audioMonitor: MockAudioActivityMonitor = MockAudioActivityMonitor(warm: true),
         transcriber: any TranscriptionEngine = PipelineTranscriberMock(),
         corrector: PipelineCorrectorMock = PipelineCorrectorMock(),
         inserter: any TextInserting = PipelineInserterMock(),
@@ -328,7 +334,8 @@ struct DictationPipelineTests {
         appDetector: MockAppDetector = MockAppDetector(
             app: ActiveApp(bundleIdentifier: "com.test", localizedName: "TestApp")
         ),
-        settings: SettingsManager? = nil
+        settings: SettingsManager? = nil,
+        recordingTailDuration: Duration = .zero
     ) -> DictationPipeline {
         let testSettings = settings ?? makeTestSettings()
         let deps = PipelineDependencies(
@@ -342,7 +349,9 @@ struct DictationPipelineTests {
             appDetector: appDetector,
             store: store,
             sound: sound,
-            settings: testSettings
+            audioMonitor: audioMonitor,
+            settings: testSettings,
+            recordingTailDuration: recordingTailDuration
         )
         return DictationPipeline(dependencies: deps)
     }
@@ -456,6 +465,74 @@ struct DictationPipelineTests {
 
         #expect(sound.stopPlayed)
 
+        tearDown(hotkey: hotkey, task: task)
+    }
+
+    @Test("handleStart when audio warm: plays start sound, does not prewarm")
+    @MainActor
+    func warmAudioPlaysSoundNotPrewarm() async {
+        let hotkey = PipelineHotkeyMock()
+        let sound = PipelineSoundMock()
+        let monitor = MockAudioActivityMonitor(warm: true)
+        let pipeline = makeSUT(hotkey: hotkey, sound: sound, audioMonitor: monitor)
+
+        let task = await activatePipeline(pipeline)
+
+        hotkey.send(.recordingStarted)
+        _ = await waitUntil { sound.startPlayed }
+
+        #expect(sound.startPlayed)
+        #expect(!sound.prewarmed)
+
+        hotkey.send(.recordingStopped)
+        try? await Task.sleep(for: .milliseconds(100))
+        tearDown(hotkey: hotkey, task: task)
+    }
+
+    @Test("handleStop: tail-recording delays recorder stop by configured duration")
+    @MainActor
+    func recordingTailDelaysRecorderStop() async {
+        let hotkey = PipelineHotkeyMock()
+        let recorder = PipelineRecorderMock()
+        let pipeline = makeSUT(
+            hotkey: hotkey,
+            recorder: recorder,
+            recordingTailDuration: .milliseconds(200)
+        )
+
+        let task = await activatePipeline(pipeline)
+        hotkey.send(.recordingStarted)
+        _ = await waitUntil { recorder.startCalled }
+
+        let tStop = ContinuousClock.now
+        hotkey.send(.recordingStopped)
+        _ = await waitUntil(timeout: .seconds(3)) { recorder.stopCalled }
+        let elapsed = ContinuousClock.now - tStop
+
+        // At least ~tail duration must have passed before stopRecording was called.
+        // Small tolerance for scheduling; compare in milliseconds to avoid Duration-comparison complexity.
+        #expect(elapsed.millisInt >= 180, "stop came too early: \(elapsed.millisInt)ms")
+        tearDown(hotkey: hotkey, task: task)
+    }
+
+    @Test("handleStart when audio cold: skips start sound, primes in background")
+    @MainActor
+    func coldAudioSkipsSoundAndPrewarms() async {
+        let hotkey = PipelineHotkeyMock()
+        let sound = PipelineSoundMock()
+        let monitor = MockAudioActivityMonitor(warm: false)
+        let pipeline = makeSUT(hotkey: hotkey, sound: sound, audioMonitor: monitor)
+
+        let task = await activatePipeline(pipeline)
+
+        hotkey.send(.recordingStarted)
+        _ = await waitUntil { sound.prewarmed }
+
+        #expect(!sound.startPlayed)
+        #expect(sound.prewarmed)
+
+        hotkey.send(.recordingStopped)
+        try? await Task.sleep(for: .milliseconds(100))
         tearDown(hotkey: hotkey, task: task)
     }
 

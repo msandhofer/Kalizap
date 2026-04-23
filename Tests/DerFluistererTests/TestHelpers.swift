@@ -13,9 +13,37 @@ final class SendableBox<T>: @unchecked Sendable {
 
 final class MockSoundBackend: SoundBackend, @unchecked Sendable {
     var playedSounds: [SoundEffect] = []
+    var prewarmCallCount = 0
 
     func play(_ sound: SoundEffect) {
         playedSounds.append(sound)
+    }
+
+    func prewarm() {
+        prewarmCallCount += 1
+    }
+}
+
+// MARK: - AudioActivityMonitor Mock
+
+final class MockAudioActivityMonitor: AudioActivityMonitoring, @unchecked Sendable {
+    private let lock = NSLock()
+    private var warm: Bool
+
+    init(warm: Bool = true) {
+        self.warm = warm
+    }
+
+    func isAudioWarm() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return warm
+    }
+
+    func setWarm(_ value: Bool) {
+        lock.lock()
+        warm = value
+        lock.unlock()
     }
 }
 
