@@ -31,4 +31,6 @@ Hinweis: Die App ist nicht notarized (bewusste Entscheidung — kein Apple Devel
 
 ## Lizenz
 
-[Apache License 2.0](LICENSE) — Copyright 2026 Mathias Sandhofer
+[PolyForm Noncommercial License 1.0.0](LICENSE) — Copyright 2026 Mathias Sandhofer
+
+Nicht-kommerzielle Nutzung (privat, Forschung, Lernen, Beitragen) ist frei erlaubt. Kommerzielle Nutzung, Weiterverkauf oder Einbindung in kommerzielle Produkte ist nicht gestattet. Bei Interesse an einer kommerziellen Lizenz bitte anfragen.
