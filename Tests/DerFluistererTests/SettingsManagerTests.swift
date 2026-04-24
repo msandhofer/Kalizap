@@ -204,6 +204,18 @@ final class SettingsManagerPersistenceTests: XCTestCase {
         XCTAssertEqual(second.system.historyLimit, 50)
         XCTAssertEqual(second.system.debugMode, true)
     }
+
+    func test_systemSettings_dismissedUpdateVersion_defaultsToNil() {
+        let settings = SystemSettings()
+        XCTAssertNil(settings.dismissedUpdateVersion)
+    }
+
+    func test_systemSettings_dismissedUpdateVersion_persistsAcrossDecode() throws {
+        let original = SystemSettings(autoStart: false, historyLimit: 100, debugMode: false, dismissedUpdateVersion: "0.2.0")
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(SystemSettings.self, from: data)
+        XCTAssertEqual(decoded.dismissedUpdateVersion, "0.2.0")
+    }
 }
 
 // MARK: - API Key

@@ -13,6 +13,9 @@ final class AppState {
     private var bootstrapped = false
     private var apiKeyToastShown = false
 
+    private(set) var updateState: UpdateState = .unknown
+    private var updateChecker: UpdateChecker?
+
     init(settings: SettingsManager, store: any DictationStoring) {
         self.settings = settings
         self.store = store
@@ -26,8 +29,38 @@ final class AppState {
 
         await settings.validateAPIKey()
         await startPipeline()
+        await triggerUpdateCheckIfNeeded()
 
         observeSettingsChanges()
+    }
+
+    func checkForUpdatesManually() async {
+        if updateChecker == nil { await triggerUpdateCheckIfNeeded(force: true); return }
+        updateState = await updateChecker!.checkNow()
+    }
+
+    func dismissUpdateVersion(_ version: String) {
+        settings.system.dismissedUpdateVersion = version
+    }
+
+    private func triggerUpdateCheckIfNeeded(force: Bool = false) async {
+        let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
+        let releases = GitHubReleasesClient(owner: "msandhofer", repo: "Fluesterclon")
+        let brew = HomebrewDetector()
+        let checker = UpdateChecker(
+            currentVersion: currentVersion,
+            releasesClient: releases,
+            homebrewDetector: brew,
+            githubReleaseBaseURL: URL(string: "https://github.com/msandhofer/Fluesterclon/releases/latest")!,
+            homebrewCaskCommand: "brew upgrade --cask msandhofer/derfluesterer/derfluesterer"
+        )
+        updateChecker = checker
+        if force {
+            updateState = await checker.checkNow()
+        } else {
+            _ = await checker.checkIfDue(defaults: .standard)
+            updateState = checker.lastCheckState
+        }
     }
 
     func restartPipeline() async {

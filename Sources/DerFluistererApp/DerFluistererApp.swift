@@ -34,7 +34,7 @@ struct DerFluistererApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarView(settings: appState.settings, pipeline: appState.pipeline, historyVM: appState.historyVM)
+            MenuBarView(settings: appState.settings, pipeline: appState.pipeline, historyVM: appState.historyVM, appState: appState)
         } label: {
             Image(systemName: appState.menuBarIcon)
                 .task {

@@ -161,10 +161,21 @@ public struct SystemSettings: Codable, Equatable {
     public var autoStart: Bool = false
     public var historyLimit: Int = 100
     public var debugMode: Bool = false
-    public init(autoStart: Bool = false, historyLimit: Int = 100, debugMode: Bool = false) {
+    public var dismissedUpdateVersion: String? = nil
+
+    public init(autoStart: Bool = false, historyLimit: Int = 100, debugMode: Bool = false, dismissedUpdateVersion: String? = nil) {
         self.autoStart = autoStart
         self.historyLimit = historyLimit
         self.debugMode = debugMode
+        self.dismissedUpdateVersion = dismissedUpdateVersion
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        autoStart = try container.decodeIfPresent(Bool.self, forKey: .autoStart) ?? false
+        historyLimit = try container.decodeIfPresent(Int.self, forKey: .historyLimit) ?? 100
+        debugMode = try container.decodeIfPresent(Bool.self, forKey: .debugMode) ?? false
+        dismissedUpdateVersion = try container.decodeIfPresent(String.self, forKey: .dismissedUpdateVersion)
     }
 }
 

@@ -10,7 +10,7 @@ struct SettingsView: View {
         ScrollView {
             Form {
                 HotkeySettingsSection(settings: settings, appState: appState)
-                SystemSettingsSection(settings: settings)
+                SystemSettingsSection(settings: settings, appState: appState)
                 MicrophoneSettingsSection(settings: settings)
                 LanguageSettingsSection(settings: settings)
                 FeedbackSettingsSection(settings: settings)
@@ -53,7 +53,14 @@ struct HotkeySettingsSection: View {
 
 struct SystemSettingsSection: View {
     @Bindable var settings: SettingsManager
+    var appState: AppState
     @State private var autoStartError: String?
+
+    private var bannerStrings: BannerStrings {
+        UpdateBannerLocalization.strings(
+            for: .from(localeIdentifier: Locale.current.language.languageCode?.identifier)
+        )
+    }
 
     var body: some View {
         Section("System") {
@@ -81,6 +88,10 @@ struct SystemSettingsSection: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                 }
+            }
+
+            Button(bannerStrings.checkForUpdatesButton) {
+                Task { await appState.checkForUpdatesManually() }
             }
         }
     }

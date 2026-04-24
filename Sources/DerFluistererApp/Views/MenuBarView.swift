@@ -5,6 +5,7 @@ struct MenuBarView: View {
     @Bindable var settings: SettingsManager
     var pipeline: DictationPipeline?
     var historyVM: HistoryViewModel
+    var appState: AppState
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -12,6 +13,15 @@ struct MenuBarView: View {
             Text("DerFlüsterer")
                 .font(.headline)
                 .padding(.top, 8)
+
+            UpdateBannerView(
+                state: appState.updateState,
+                dismissedVersion: settings.system.dismissedUpdateVersion,
+                onDismiss: { version in appState.dismissUpdateVersion(version) },
+                strings: UpdateBannerLocalization.strings(
+                    for: .from(localeIdentifier: Locale.current.language.languageCode?.identifier)
+                )
+            )
 
             pipelineStatusView
 
