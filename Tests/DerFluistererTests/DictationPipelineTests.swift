@@ -359,11 +359,11 @@ struct DictationPipelineTests {
     @MainActor
     private func makeTestSettings() -> SettingsManager {
         let defaults = UserDefaults(suiteName: "pipeline-tests-\(UUID().uuidString)")!
-        let keychain = MockKeychainService()
-        keychain.storage["anthropic-api-key"] = "test-key"
+        let credentialStore = MockCredentialStore()
+        credentialStore.storage["anthropic-api-key"] = "test-key"
         let settings = SettingsManager(
             defaults: defaults,
-            keychain: keychain,
+            credentialStore: credentialStore,
             apiKeyValidator: MockAPIKeyValidator()
         )
         // Pre-populate the API key cache so pipeline doesn't block on missing key

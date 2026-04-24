@@ -9,3 +9,6 @@ DerivedData/
 *.swp
 *~
 .superpowers/
+
+# Build-Time-Secret für API-Key-Verschlüsselung (siehe docs/build-secret.md)
+Sources/DerFluistererApp/AppSecret.swift

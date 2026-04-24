@@ -22,11 +22,11 @@ final class LaunchAtLoginTests: XCTestCase {
 
     func test_enableAutoStart_registersService() throws {
         let mock = MockLaunchAtLoginService()
-        let keychain = MockKeychainService()
+        let credentialStore = MockCredentialStore()
         let validator = MockAPIKeyValidator()
         let sut = SettingsManager(
             defaults: UserDefaults(suiteName: "test.autostart.\(UUID())")!,
-            keychain: keychain,
+            credentialStore: credentialStore,
             apiKeyValidator: validator,
             launchAtLogin: mock
         )
@@ -39,11 +39,11 @@ final class LaunchAtLoginTests: XCTestCase {
 
     func test_disableAutoStart_unregistersService() throws {
         let mock = MockLaunchAtLoginService()
-        let keychain = MockKeychainService()
+        let credentialStore = MockCredentialStore()
         let validator = MockAPIKeyValidator()
         let sut = SettingsManager(
             defaults: UserDefaults(suiteName: "test.autostart.\(UUID())")!,
-            keychain: keychain,
+            credentialStore: credentialStore,
             apiKeyValidator: validator,
             launchAtLogin: mock
         )

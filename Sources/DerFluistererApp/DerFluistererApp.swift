@@ -7,8 +7,9 @@ struct DerFluistererApp: App {
     @State private var appState: AppState
 
     init() {
+        let credentialStore = Self.makeCredentialStore()
         let settings = SettingsManager(
-            keychain: KeychainService(),
+            credentialStore: credentialStore,
             apiKeyValidator: AnthropicAPIKeyValidator(),
             launchAtLogin: LaunchAtLoginService()
         )
@@ -19,6 +20,16 @@ struct DerFluistererApp: App {
         let store: any DictationStoring = DictationStoreImpl(modelContainer: container)
         _appState = State(initialValue: AppState(settings: settings, store: store))
         FileLog.log("App.init completed — language=\(settings.audio.language.rawValue)")
+    }
+
+    private static func makeCredentialStore() -> EncryptedCredentialStore {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let baseDir = appSupport.appendingPathComponent("DerFluisterer", isDirectory: true)
+        return EncryptedCredentialStore(
+            baseDirectory: baseDir,
+            identity: ProductionHardwareIdentity(),
+            appSecret: AppSecret.bytes
+        )
     }
 
     var body: some Scene {

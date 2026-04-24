@@ -172,7 +172,7 @@ public enum APIKeyStatus: Equatable, Sendable {
     case missing, validating, valid, invalid(String)
 }
 
-public protocol KeychainServiceProtocol: Sendable {
+public protocol CredentialStoreProtocol: Sendable {
     func store(_ value: String, for account: String) throws
     func retrieve(for account: String) throws -> String
     func delete(for account: String) throws
@@ -207,10 +207,10 @@ public final class SettingsManager {
     /// Convenience accessor for backward compatibility.
     public var apiKeyStatus: APIKeyStatus { apiKey.status }
 
-    public init(defaults: UserDefaults = .standard, keychain: any KeychainServiceProtocol, apiKeyValidator: any APIKeyValidating, launchAtLogin: any LaunchAtLoginProtocol = NoOpLaunchAtLogin()) {
+    public init(defaults: UserDefaults = .standard, credentialStore: any CredentialStoreProtocol, apiKeyValidator: any APIKeyValidating, launchAtLogin: any LaunchAtLoginProtocol = NoOpLaunchAtLogin()) {
         self.defaults = defaults
         self.launchAtLogin = launchAtLogin
-        self.apiKey = APIKeyManager(keychain: keychain, validator: apiKeyValidator)
+        self.apiKey = APIKeyManager(credentialStore: credentialStore, validator: apiKeyValidator)
         self.audio = Self.load(from: defaults, forKey: "audio") ?? AudioSettings()
         self.hotkey = Self.load(from: defaults, forKey: "hotkey") ?? HotkeySettings()
         self.correction = Self.load(from: defaults, forKey: "correction") ?? CorrectionSettings()

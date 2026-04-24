@@ -5,9 +5,13 @@ print("=== CorrectorTestCLI ===")
 print("Testet Claude Haiku Textkorrektur mit echtem API-Call.")
 print("")
 
-let keychain = KeychainService()
+enum CLIError: Error { case missingAPIKey }
+
 let apiKeyProvider: @Sendable () throws -> String = {
-    try keychain.retrieve(for: "anthropic-api-key")
+    guard let key = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"], !key.isEmpty else {
+        throw CLIError.missingAPIKey
+    }
+    return key
 }
 
 // Verify API key exists
@@ -15,8 +19,8 @@ do {
     let key = try apiKeyProvider()
     print("✓ API Key gefunden (\(key.prefix(10))...)")
 } catch {
-    print("✗ Kein API Key in Keychain: \(error)")
-    print("  Speichere mit: security add-generic-password -s \"com.derfluisterer\" -a \"anthropic-api-key\" -w \"sk-ant-...\" -U")
+    print("✗ Kein API Key in Umgebungsvariable: \(error)")
+    print("  Setze mit: export ANTHROPIC_API_KEY=\"sk-ant-...\"")
     exit(1)
 }
 print("")

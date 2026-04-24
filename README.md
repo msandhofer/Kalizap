@@ -29,6 +29,20 @@ Hinweis: Die App ist nicht notarized (bewusste Entscheidung — kein Apple Devel
 - Apple Silicon (ARM64)
 - Anthropic API-Key für die LLM-Korrektur (optional — ohne Key läuft reine Transkription)
 
+## Build from source
+
+Voraussetzungen: Xcode 15+ / Swift 6.2, macOS 26+.
+
+```bash
+git clone https://github.com/msandhofer/Fluesterclon.git
+cd Fluesterclon
+git lfs pull                           # DeepFilterNet-Modell laden
+./Scripts/generate-app-secret.sh       # einmalig: App-Secret für API-Key-Verschlüsselung
+swift build -c release
+```
+
+Der API-Key wird als AES-GCM-verschlüsselte Datei unter `~/Library/Application Support/DerFluisterer/` abgelegt. Der Schlüssel ist an Gerät (`IOPlatformUUID`), User-Account (`NSUserName`) und das Build-Time-injizierte App-Secret gebunden. Details und Bedrohungsmodell: [`docs/security.md`](docs/security.md). Hinweise zum App-Secret: [`docs/build-secret.md`](docs/build-secret.md).
+
 ## Lizenz
 
 [PolyForm Noncommercial License 1.0.0](LICENSE) — Copyright 2026 Mathias Sandhofer

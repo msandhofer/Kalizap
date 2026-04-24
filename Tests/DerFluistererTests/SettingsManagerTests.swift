@@ -1,7 +1,7 @@
 import XCTest
 @testable import DerFluisterer
 
-final class MockKeychainService: KeychainServiceProtocol, @unchecked Sendable {
+final class MockCredentialStore: CredentialStoreProtocol, @unchecked Sendable {
     var storage: [String: String] = [:]
 
     func store(_ value: String, for account: String) throws {
@@ -37,12 +37,12 @@ private let noOpValidator = MockAPIKeyValidator()
 @MainActor
 func makeSettingsManager(
     suiteName: String = "test.\(UUID())",
-    keychain: MockKeychainService = MockKeychainService(),
+    credentialStore: MockCredentialStore = MockCredentialStore(),
     validator: MockAPIKeyValidator = noOpValidator
 ) -> SettingsManager {
     SettingsManager(
         defaults: UserDefaults(suiteName: suiteName)!,
-        keychain: keychain,
+        credentialStore: credentialStore,
         apiKeyValidator: validator
     )
 }
@@ -161,13 +161,13 @@ final class SettingsManagerPersistenceTests: XCTestCase {
 
     func test_audioSettings_persistAcrossInstances() {
         let suiteName = "test.persist.\(UUID())"
-        let keychain = MockKeychainService()
+        let credentialStore = MockCredentialStore()
 
-        let first = makeSettingsManager(suiteName: suiteName, keychain: keychain)
+        let first = makeSettingsManager(suiteName: suiteName, credentialStore: credentialStore)
         first.audio.language = .en
         first.audio.soundsEnabled = false
 
-        let second = makeSettingsManager(suiteName: suiteName, keychain: keychain)
+        let second = makeSettingsManager(suiteName: suiteName, credentialStore: credentialStore)
 
         XCTAssertEqual(second.audio.language, .en)
         XCTAssertEqual(second.audio.soundsEnabled, false)
@@ -175,15 +175,15 @@ final class SettingsManagerPersistenceTests: XCTestCase {
 
     func test_correctionSettings_persistAcrossInstances() {
         let suiteName = "test.persist.\(UUID())"
-        let keychain = MockKeychainService()
+        let credentialStore = MockCredentialStore()
 
-        let first = makeSettingsManager(suiteName: suiteName, keychain: keychain)
+        let first = makeSettingsManager(suiteName: suiteName, credentialStore: credentialStore)
         first.correction.contextMode = .formal
         first.correction.allowRephrasing = true
         first.correction.personalDictionary = ["WhisperKit", "SwiftUI"]
         first.correction.llmTimeoutMs = 1200
 
-        let second = makeSettingsManager(suiteName: suiteName, keychain: keychain)
+        let second = makeSettingsManager(suiteName: suiteName, credentialStore: credentialStore)
 
         XCTAssertEqual(second.correction.contextMode, .formal)
         XCTAssertEqual(second.correction.allowRephrasing, true)
@@ -193,13 +193,13 @@ final class SettingsManagerPersistenceTests: XCTestCase {
 
     func test_systemSettings_persistAcrossInstances() {
         let suiteName = "test.persist.\(UUID())"
-        let keychain = MockKeychainService()
+        let credentialStore = MockCredentialStore()
 
-        let first = makeSettingsManager(suiteName: suiteName, keychain: keychain)
+        let first = makeSettingsManager(suiteName: suiteName, credentialStore: credentialStore)
         first.system.historyLimit = 50
         first.system.debugMode = true
 
-        let second = makeSettingsManager(suiteName: suiteName, keychain: keychain)
+        let second = makeSettingsManager(suiteName: suiteName, credentialStore: credentialStore)
 
         XCTAssertEqual(second.system.historyLimit, 50)
         XCTAssertEqual(second.system.debugMode, true)
@@ -211,10 +211,10 @@ final class SettingsManagerPersistenceTests: XCTestCase {
 @MainActor
 final class SettingsManagerAPIKeyTests: XCTestCase {
 
-    private func makeSUT() -> (SettingsManager, MockKeychainService) {
-        let keychain = MockKeychainService()
-        let sut = makeSettingsManager(keychain: keychain)
-        return (sut, keychain)
+    private func makeSUT() -> (SettingsManager, MockCredentialStore) {
+        let credentialStore = MockCredentialStore()
+        let sut = makeSettingsManager(credentialStore: credentialStore)
+        return (sut, credentialStore)
     }
 
     func test_setAPIKey_storesInKeychain() throws {
@@ -271,9 +271,9 @@ final class SettingsManagerAPIKeyTests: XCTestCase {
 final class SettingsManagerValidationTests: XCTestCase {
 
     func test_validateAPIKey_transitionsToValid() async throws {
-        let keychain = MockKeychainService()
+        let credentialStore = MockCredentialStore()
         let validator = MockAPIKeyValidator()
-        let sut = makeSettingsManager(keychain: keychain, validator: validator)
+        let sut = makeSettingsManager(credentialStore: credentialStore, validator: validator)
         try sut.setAPIKey("sk-ant-valid-key")
 
         await sut.validateAPIKey()
@@ -282,10 +282,10 @@ final class SettingsManagerValidationTests: XCTestCase {
     }
 
     func test_validateAPIKey_transitionsToInvalidOnError() async throws {
-        let keychain = MockKeychainService()
+        let credentialStore = MockCredentialStore()
         let validator = MockAPIKeyValidator()
         validator.result = .failure(NSError(domain: "test", code: 401, userInfo: [NSLocalizedDescriptionKey: "Invalid API key"]))
-        let sut = makeSettingsManager(keychain: keychain, validator: validator)
+        let sut = makeSettingsManager(credentialStore: credentialStore, validator: validator)
         try sut.setAPIKey("sk-ant-bad-key")
 
         await sut.validateAPIKey()
