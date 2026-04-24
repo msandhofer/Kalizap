@@ -1,7 +1,7 @@
 import Foundation
 
 public enum AppConstants {
-    public static let defaultLLMTimeoutMs: Int = 800
+    public static let defaultLLMTimeoutMs: Int = 5000
 
     /// Extra recording duration kept after keyup so a hastily released hotkey
     /// doesn't truncate the user's last word. The recorder runs this long past
