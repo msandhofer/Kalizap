@@ -23,7 +23,7 @@ struct DerFluistererApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarView(settings: appState.settings, pipeline: appState.pipeline, updater: appState.updater, historyVM: appState.historyVM)
+            MenuBarView(settings: appState.settings, pipeline: appState.pipeline, historyVM: appState.historyVM)
         } label: {
             Image(systemName: appState.menuBarIcon)
                 .task {
@@ -33,7 +33,7 @@ struct DerFluistererApp: App {
         .menuBarExtraStyle(.window)
 
         Window("Einstellungen", id: "settings") {
-            MainWindowView(appState: appState, updater: appState.updater)
+            MainWindowView(appState: appState)
         }
         .windowResizability(.contentMinSize)
         .defaultSize(width: 600, height: 560)

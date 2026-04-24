@@ -4,7 +4,6 @@ import DerFluisterer
 struct MenuBarView: View {
     @Bindable var settings: SettingsManager
     var pipeline: DictationPipeline?
-    var updater: SparkleUpdater?
     var historyVM: HistoryViewModel
     @Environment(\.openWindow) private var openWindow
 

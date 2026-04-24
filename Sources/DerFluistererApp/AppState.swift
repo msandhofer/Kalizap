@@ -4,7 +4,6 @@ import DerFluisterer
 @Observable @MainActor
 final class AppState {
     private(set) var pipeline: DictationPipeline?
-    private(set) var updater: SparkleUpdater?
 
     let settings: SettingsManager
     let historyVM: HistoryViewModel
@@ -24,10 +23,6 @@ final class AppState {
     func bootstrap() async {
         guard !bootstrapped else { return }
         bootstrapped = true
-
-        let u = SparkleUpdater(settings: settings)
-        updater = u
-        u.start()
 
         await settings.validateAPIKey()
         await startPipeline()

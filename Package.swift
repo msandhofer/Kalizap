@@ -11,7 +11,6 @@ let package = Package(
         .library(name: "DerFluisterer", targets: ["DerFluisterer"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/sparkle-project/Sparkle.git", from: "2.7.0"),
         .package(url: "https://github.com/soniqo/speech-swift", branch: "main"),
     ],
     targets: [
@@ -31,7 +30,6 @@ let package = Package(
             name: "DerFluisterer",
             dependencies: [
                 "CDeepFilter",
-                .product(name: "Sparkle", package: "Sparkle"),
             ]
         ),
         .executableTarget(

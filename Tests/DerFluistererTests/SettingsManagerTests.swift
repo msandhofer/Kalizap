@@ -72,14 +72,6 @@ final class SettingsManagerDefaultsTests: XCTestCase {
         XCTAssertEqual(sut.system, SystemSettings())
     }
 
-    func test_newSettingsManager_hasCorrectUpdateDefaults() {
-        let sut = makeSettingsManager()
-        XCTAssertEqual(sut.update, UpdateSettings())
-        XCTAssertTrue(sut.update.autoCheckEnabled)
-        XCTAssertFalse(sut.update.silentAutoUpdate)
-        XCTAssertNil(sut.update.lastSuccessfulUpdateCheck)
-    }
-
     func test_defaultAppMappings_arePreConfigured() {
         let defaults = CorrectionSettings()
         XCTAssertEqual(defaults.appMapping["com.apple.mail"], .formal)
@@ -197,23 +189,6 @@ final class SettingsManagerPersistenceTests: XCTestCase {
         XCTAssertEqual(second.correction.allowRephrasing, true)
         XCTAssertEqual(second.correction.personalDictionary, ["WhisperKit", "SwiftUI"])
         XCTAssertEqual(second.correction.llmTimeoutMs, 1200)
-    }
-
-    func test_updateSettings_persistAcrossInstances() {
-        let suiteName = "test.persist.\(UUID())"
-        let keychain = MockKeychainService()
-
-        let first = makeSettingsManager(suiteName: suiteName, keychain: keychain)
-        first.update.autoCheckEnabled = false
-        first.update.silentAutoUpdate = true
-        let checkDate = Date(timeIntervalSince1970: 1_700_000_000)
-        first.update.lastSuccessfulUpdateCheck = checkDate
-
-        let second = makeSettingsManager(suiteName: suiteName, keychain: keychain)
-
-        XCTAssertEqual(second.update.autoCheckEnabled, false)
-        XCTAssertEqual(second.update.silentAutoUpdate, true)
-        XCTAssertEqual(second.update.lastSuccessfulUpdateCheck, checkDate)
     }
 
     func test_systemSettings_persistAcrossInstances() {

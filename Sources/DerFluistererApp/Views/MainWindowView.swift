@@ -4,14 +4,13 @@ import DerFluisterer
 
 struct MainWindowView: View {
     @Bindable var appState: AppState
-    var updater: SparkleUpdater?
 
     var body: some View {
         TabView {
             HistoryView(viewModel: appState.historyVM)
                 .tabItem { Label("History", systemImage: "clock.arrow.circlepath") }
 
-            SettingsView(settings: appState.settings, appState: appState, updater: updater)
+            SettingsView(settings: appState.settings, appState: appState)
                 .tabItem { Label("Einstellungen", systemImage: "gear") }
 
             StatisticsView(viewModel: appState.statisticsVM)

@@ -5,14 +5,12 @@ import DerFluisterer
 struct SettingsView: View {
     @Bindable var settings: SettingsManager
     @Bindable var appState: AppState
-    var updater: SparkleUpdater?
 
     var body: some View {
         ScrollView {
             Form {
                 HotkeySettingsSection(settings: settings, appState: appState)
                 SystemSettingsSection(settings: settings)
-                UpdateSettingsSection(settings: settings, updater: updater)
                 MicrophoneSettingsSection(settings: settings)
                 LanguageSettingsSection(settings: settings)
                 FeedbackSettingsSection(settings: settings)
@@ -83,44 +81,6 @@ struct SystemSettingsSection: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                 }
-            }
-        }
-    }
-}
-
-// MARK: - Update
-
-struct UpdateSettingsSection: View {
-    @Bindable var settings: SettingsManager
-    var updater: SparkleUpdater?
-
-    var body: some View {
-        Section("Updates") {
-            Toggle("Automatisch nach Updates suchen", isOn: $settings.update.autoCheckEnabled)
-
-            Toggle("Updates automatisch im Hintergrund installieren", isOn: $settings.update.silentAutoUpdate)
-                .disabled(!settings.update.autoCheckEnabled)
-
-            Button("Jetzt nach Updates suchen…") {
-                updater?.checkForUpdates()
-            }
-            .disabled(updater?.canCheckForUpdates != true)
-
-            if let warning = settings.feedUnreachableWarning {
-                Label(warning, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-                    .font(.caption)
-            }
-
-            LabeledContent("Update-Feed") {
-                Text(SparkleUpdater.feedURL.absoluteString)
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-            }
-
-            Button("Release Notes anzeigen") {
-                NSWorkspace.shared.open(SparkleUpdater.releaseNotesURL)
             }
         }
     }
