@@ -213,4 +213,24 @@ final class TextCorrectorTests: XCTestCase {
 
         XCTAssertTrue(captured.value?.contains("Formell") == true)
     }
+
+    // MARK: - Cycle 11: User-Message wird in <diktat>-Tags gewrappt (Issue #50)
+
+    func test_correct_wrapsUserTextInDiktatTags() async {
+        let capturedUserText = SendableBox<String?>(nil)
+        let sut = makeSUT(transport: { _, userText, _ in
+            capturedUserText.set(userText)
+            return "corrected"
+        })
+
+        _ = await sut.correct(makeTestTranscriptionResult("mein diktat"))
+
+        guard let got = capturedUserText.value else {
+            XCTFail("Transport wurde nicht aufgerufen")
+            return
+        }
+        XCTAssertTrue(got.contains("<diktat>"), "User-Text muss in <diktat>-Tag eingeschlossen sein")
+        XCTAssertTrue(got.contains("</diktat>"), "User-Text muss mit </diktat> schliessen")
+        XCTAssertTrue(got.contains("mein diktat"), "Roh-Text muss im gewrappten User-Text erhalten bleiben")
+    }
 }

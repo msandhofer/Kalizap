@@ -89,6 +89,11 @@ let package = Package(
             path: "Tools/InsertDelayScreenshotTest",
             exclude: ["screenshots"]
         ),
+        .executableTarget(
+            name: "PromptJailbreakTest",
+            dependencies: [],
+            path: "Tools/PromptJailbreakTest"
+        ),
         .target(
             name: "STTTestCommon",
             path: "Tools/STTTestCommon"

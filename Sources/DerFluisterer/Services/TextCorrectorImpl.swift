@@ -25,9 +25,11 @@ public final class TextCorrectorImpl: TextCorrecting, @unchecked Sendable {
         var lastError: Error?
         let maxAttempts = 1 + config.maxRetries
 
+        let wrappedUserText = "<diktat>\n\(rawText)\n</diktat>"
+
         for attempt in 1...maxAttempts {
             do {
-                let correctedText = try await callWithTimeout(systemPrompt: systemPrompt, userText: rawText)
+                let correctedText = try await callWithTimeout(systemPrompt: systemPrompt, userText: wrappedUserText)
 
                 guard !correctedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                     let outcome = CorrectionOutcome.fallbackRaw(text: rawText, reason: .emptyResponse)
