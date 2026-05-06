@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generiert einmalig Sources/DerFluistererApp/AppSecret.swift mit 32 Byte Random-Secret.
+# Generiert einmalig Sources/KalizapApp/AppSecret.swift mit 32 Byte Random-Secret.
 # Scheitert hart, wenn die Datei bereits existiert — keine stille Rotation.
 # Siehe docs/build-secret.md.
 
@@ -8,7 +8,7 @@ set -euo pipefail
 # Script vom Projekt-Root aus aufrufbar machen
 cd "$(dirname "$0")/.."
 
-TARGET="Sources/DerFluistererApp/AppSecret.swift"
+TARGET="Sources/KalizapApp/AppSecret.swift"
 
 if [ -f "$TARGET" ]; then
   echo "FEHLER: $TARGET existiert bereits. Nicht überschrieben." >&2

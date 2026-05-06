@@ -1,5 +1,5 @@
 import Foundation
-import DerFluisterer
+import Kalizap
 import STTTestCommon
 
 // MARK: - Batch Mode

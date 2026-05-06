@@ -1,5 +1,5 @@
 import Foundation
-import DerFluisterer
+import Kalizap
 
 print("=== TextInsertTestCLI ===")
 print("Testet Text-Einfügung via Clipboard + Cmd+V.")
@@ -61,7 +61,7 @@ Task {
         try? await Task.sleep(for: .seconds(1))
     }
 
-    let testText = "Hallo von DerFlüsterer! 🎤"
+    let testText = "Hallo von Kalizap! 🎤"
     print("  Füge ein: \"\(testText)\"")
 
     let result = await inserter.insert(testText)

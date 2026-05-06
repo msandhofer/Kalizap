@@ -4,13 +4,13 @@ Dieses Dokument richtet sich an Mitwirkende und an den Projekt-Maintainer.
 
 ## Zweck
 
-Das App-Secret ist ein zufälliger 32-Byte-Wert, der beim Build in das Binary einkompiliert wird. Es fließt zusammen mit `IOPlatformUUID` und `NSUserName()` in die HKDF-Key-Derivation der verschlüsselten Credentials-Datei ein (`~/Library/Application Support/DerFluisterer/<account>.enc`).
+Das App-Secret ist ein zufälliger 32-Byte-Wert, der beim Build in das Binary einkompiliert wird. Es fließt zusammen mit `IOPlatformUUID` und `NSUserName()` in die HKDF-Key-Derivation der verschlüsselten Credentials-Datei ein (`~/Library/Application Support/Kalizap/<account>.enc`).
 
 Genaue Funktionsweise und Bedrohungsmodell: siehe [security.md](security.md).
 
 ## Speicherort
 
-- **Pfad:** `Sources/DerFluistererApp/AppSecret.swift`
+- **Pfad:** `Sources/KalizapApp/AppSecret.swift`
 - **Gitignore-Status:** ignoriert (siehe `.gitignore`)
 - **Format:** Swift-Datei mit einem `enum AppSecret { static let bytes: Data = ... }`
 
@@ -36,7 +36,7 @@ Warum: Bei Verlust des Secrets können alle bestehenden Release-Nutzer ihre vers
 
 Nur im echten Kompromittierungsfall. Folgen:
 
-1. `rm Sources/DerFluistererApp/AppSecret.swift`
+1. `rm Sources/KalizapApp/AppSecret.swift`
 2. `./Scripts/generate-app-secret.sh`
 3. Neues Release bauen.
 4. Release-Notes: "Alle Nutzer müssen ihren API-Key neu eintragen."

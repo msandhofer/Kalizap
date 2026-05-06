@@ -11,7 +11,7 @@ DerivedData/
 .superpowers/
 
 # Build-Time-Secret für API-Key-Verschlüsselung (siehe docs/build-secret.md)
-Sources/DerFluistererApp/AppSecret.swift
+Sources/KalizapApp/AppSecret.swift
 
 # API-Keys und Secrets für Dev-Tools (PromptJailbreakTest etc.)
 .env

@@ -1,7 +1,7 @@
 import Foundation
 import AppKit
 import CoreGraphics
-import DerFluisterer
+import Kalizap
 
 // MARK: - Argument Parsing
 

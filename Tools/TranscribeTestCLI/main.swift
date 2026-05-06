@@ -1,5 +1,5 @@
 import Foundation
-import DerFluisterer
+import Kalizap
 
 print("=== TranscribeTestCLI ===")
 print("Testet WhisperKit Batch-Transkription mit echtem Mikrofon.")

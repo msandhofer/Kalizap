@@ -1,6 +1,6 @@
 import Foundation
 import WhisperKit
-import DerFluisterer
+import Kalizap
 
 // MARK: - Configuration
 

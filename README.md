@@ -1,4 +1,4 @@
-# DerFlüsterer
+# Kalizap
 
 Native macOS Voice-to-Text App mit lokaler Whisper-Transkription und optionaler Claude-Korrektur. Menu-Bar-App, Hotkey-gesteuert, mit DeepFilterNet3 Rauschunterdrückung.
 
@@ -7,18 +7,18 @@ Native macOS Voice-to-Text App mit lokaler Whisper-Transkription und optionaler 
 ### Homebrew Cask (empfohlen)
 
 ```
-brew install --cask msandhofer/derfluesterer/derfluesterer
+brew install --cask msandhofer/kalizap/kalizap
 ```
 
-> Der Homebrew-Tap ist noch in Vorbereitung (siehe Issue #47). Bis dahin: Direct Download.
+> Der Homebrew-Tap ist noch in Vorbereitung (siehe Issue #45). Bis dahin: Direct Download.
 
 ### Direct Download (GitHub Releases)
 
-1. Neueste Version von [GitHub Releases](https://github.com/msandhofer/Fluesterclon/releases) herunterladen
-2. ZIP entpacken und `DerFlüsterer.app` nach `/Applications/` ziehen
+1. Neueste Version von [GitHub Releases](https://github.com/msandhofer/Kalizap/releases) herunterladen
+2. ZIP entpacken und `Kalizap.app` nach `/Applications/` ziehen
 3. Quarantäne-Flag entfernen — entweder per Rechts-Klick → **Öffnen** → **Öffnen** (einmaliger Gatekeeper-Bypass), oder im Terminal:
    ```
-   xattr -d com.apple.quarantine /Applications/DerFlüsterer.app
+   xattr -d com.apple.quarantine /Applications/Kalizap.app
    ```
 
 Hinweis: Die App ist nicht notarized (bewusste Entscheidung — kein Apple Developer Program). Bei jedem Update muss der Quarantäne-Bypass erneut ausgeführt werden. Über den Homebrew-Weg passiert das automatisch.
@@ -34,14 +34,14 @@ Hinweis: Die App ist nicht notarized (bewusste Entscheidung — kein Apple Devel
 Voraussetzungen: Xcode 15+ / Swift 6.2, macOS 26+.
 
 ```bash
-git clone https://github.com/msandhofer/Fluesterclon.git
-cd Fluesterclon
+git clone https://github.com/msandhofer/Kalizap.git
+cd Kalizap
 git lfs pull                           # DeepFilterNet-Modell laden
 ./Scripts/generate-app-secret.sh       # einmalig: App-Secret für API-Key-Verschlüsselung
 swift build -c release
 ```
 
-Der API-Key wird als AES-GCM-verschlüsselte Datei unter `~/Library/Application Support/DerFluisterer/` abgelegt. Der Schlüssel ist an Gerät (`IOPlatformUUID`), User-Account (`NSUserName`) und das Build-Time-injizierte App-Secret gebunden. Details und Bedrohungsmodell: [`docs/security.md`](docs/security.md). Hinweise zum App-Secret: [`docs/build-secret.md`](docs/build-secret.md).
+Der API-Key wird als AES-GCM-verschlüsselte Datei unter `~/Library/Application Support/Kalizap/` abgelegt. Der Schlüssel ist an Gerät (`IOPlatformUUID`), User-Account (`NSUserName`) und das Build-Time-injizierte App-Secret gebunden. Details und Bedrohungsmodell: [`docs/security.md`](docs/security.md). Hinweise zum App-Secret: [`docs/build-secret.md`](docs/build-secret.md).
 
 ## Lizenz
 

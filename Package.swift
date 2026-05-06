@@ -3,12 +3,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "DerFluisterer",
+    name: "Kalizap",
     platforms: [
         .macOS(.v26)
     ],
     products: [
-        .library(name: "DerFluisterer", targets: ["DerFluisterer"]),
+        .library(name: "Kalizap", targets: ["Kalizap"]),
     ],
     dependencies: [
         .package(url: "https://github.com/soniqo/speech-swift", branch: "main"),
@@ -27,14 +27,14 @@ let package = Package(
             ]
         ),
         .target(
-            name: "DerFluisterer",
+            name: "Kalizap",
             dependencies: [
                 "CDeepFilter",
             ]
         ),
         .executableTarget(
-            name: "DerFluistererApp",
-            dependencies: ["DerFluisterer"],
+            name: "KalizapApp",
+            dependencies: ["Kalizap"],
             exclude: ["Info.plist"],
             resources: [
                 .copy("Resources/DeepFilterNet3_onnx.tar.gz"),
@@ -44,33 +44,33 @@ let package = Package(
                     "-Xlinker", "-sectcreate",
                     "-Xlinker", "__TEXT",
                     "-Xlinker", "__info_plist",
-                    "-Xlinker", "Sources/DerFluistererApp/Info.plist",
+                    "-Xlinker", "Sources/KalizapApp/Info.plist",
                 ]),
             ]
         ),
         .executableTarget(
             name: "HotkeyTestCLI",
-            dependencies: ["DerFluisterer"],
+            dependencies: ["Kalizap"],
             path: "Tools/HotkeyTestCLI"
         ),
         .executableTarget(
             name: "AudioTestCLI",
-            dependencies: ["DerFluisterer"],
+            dependencies: ["Kalizap"],
             path: "Tools/AudioTestCLI"
         ),
         .executableTarget(
             name: "TextInsertTestCLI",
-            dependencies: ["DerFluisterer"],
+            dependencies: ["Kalizap"],
             path: "Tools/TextInsertTestCLI"
         ),
         .executableTarget(
             name: "CorrectorTestCLI",
-            dependencies: ["DerFluisterer"],
+            dependencies: ["Kalizap"],
             path: "Tools/CorrectorTestCLI"
         ),
         .executableTarget(
             name: "VoiceProcessingTestCLI",
-            dependencies: ["DerFluisterer", "CDeepFilter"],
+            dependencies: ["Kalizap", "CDeepFilter"],
             path: "Tools/VoiceProcessingTestCLI"
         ),
         .executableTarget(
@@ -80,12 +80,12 @@ let package = Package(
         ),
         .executableTarget(
             name: "InsertDelayTest",
-            dependencies: ["DerFluisterer"],
+            dependencies: ["Kalizap"],
             path: "Tools/InsertDelayTest"
         ),
         .executableTarget(
             name: "InsertDelayScreenshotTest",
-            dependencies: ["DerFluisterer"],
+            dependencies: ["Kalizap"],
             path: "Tools/InsertDelayScreenshotTest",
             exclude: ["screenshots"]
         ),
@@ -124,8 +124,8 @@ let package = Package(
             path: "Tools/SpeechSwiftTestCLI"
         ),
         .testTarget(
-            name: "DerFluistererTests",
-            dependencies: ["DerFluisterer"]
+            name: "KalizapTests",
+            dependencies: ["Kalizap"]
         ),
         .testTarget(
             name: "STTTestCommonTests",

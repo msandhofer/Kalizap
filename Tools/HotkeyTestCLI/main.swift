@@ -1,5 +1,5 @@
 import Foundation
-import DerFluisterer
+import Kalizap
 
 print("=== HotkeyTestCLI ===")
 print("Testet den HotkeyManager mit echtem CGEvent-Tap.")

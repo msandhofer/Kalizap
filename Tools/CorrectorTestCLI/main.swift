@@ -1,5 +1,5 @@
 import Foundation
-import DerFluisterer
+import Kalizap
 
 print("=== CorrectorTestCLI ===")
 print("Testet Claude Haiku Textkorrektur mit echtem API-Call.")
@@ -61,7 +61,7 @@ Task {
     print("Test 3: Mit persönlichem Wörterbuch")
     corrector.updateConfig(CorrectionConfig(
         contextMode: .neutral,
-        personalDictionary: ["SwiftUI", "WhisperKit", "DerFlüsterer"],
+        personalDictionary: ["SwiftUI", "WhisperKit", "Kalizap"],
         timeoutMs: 5000
     ))
 

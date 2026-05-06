@@ -2,7 +2,7 @@
 
 ## Überblick
 
-Der Anthropic-API-Key wird als AES-GCM-verschlüsselte Datei im Application-Support-Verzeichnis des Nutzers abgelegt (`~/Library/Application Support/DerFluisterer/anthropic-api-key.enc`). Der Verschlüsselungs-Schlüssel wird zur Laufzeit aus drei Quellen abgeleitet:
+Der Anthropic-API-Key wird als AES-GCM-verschlüsselte Datei im Application-Support-Verzeichnis des Nutzers abgelegt (`~/Library/Application Support/Kalizap/anthropic-api-key.enc`). Der Verschlüsselungs-Schlüssel wird zur Laufzeit aus drei Quellen abgeleitet:
 
 1. `IOPlatformUUID` (stabile Geräte-ID)
 2. `NSUserName()` (macOS-User-Account-Name)

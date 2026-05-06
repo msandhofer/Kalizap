@@ -1,5 +1,5 @@
 import Foundation
-import DerFluisterer
+import Kalizap
 
 print("=== AudioTestCLI ===")
 print("Testet AudioRecorderImpl mit echtem Mikrofon.")

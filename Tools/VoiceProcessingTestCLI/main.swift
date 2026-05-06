@@ -1,7 +1,7 @@
 import Foundation
 import AVFoundation
 import Accelerate
-import DerFluisterer
+import Kalizap
 import CDeepFilter
 
 print("=== VoiceProcessingTestCLI ===")
