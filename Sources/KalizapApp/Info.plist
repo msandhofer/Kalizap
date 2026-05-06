@@ -14,6 +14,8 @@
 	<string>1</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Kalizap nimmt Audio auf, um Ihre Diktate zu transkribieren. Die Aufnahme erfolgt nur, solange der Aufnahme-Hotkey gedrückt ist.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Kalizap nutzt Spracherkennung um Ihre Diktate in Text umzuwandeln.</string>
 </dict>
