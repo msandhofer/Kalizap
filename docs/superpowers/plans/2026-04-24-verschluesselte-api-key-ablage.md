@@ -1271,7 +1271,7 @@ Expected: Issue-State auf `closed`.
 
 - [ ] **Step 4: Memory aktualisieren**
 
-Datei: `/Users/msa/.claude/projects/-Users-msa-Library-CloudStorage-OneDrive-SandhoferConsulting-30-Lernen-KI-project-kalizap/memory/project_kalizap.md`:
+Datei: `<memory>/project_kalizap.md`:
 
 Ersetze die Zeile
 ```
