@@ -19,6 +19,9 @@ Sources/KalizapApp/AppSecret.swift
 # Lokale Test-Output-Dateien
 Tools/InsertDelayScreenshotTest/screenshots/
 
+# Build-Output von Scripts/build-app-bundle.sh
+dist/
+
 # Lokale Testaufnahmen (nicht committen — biometrische Daten, Privacy)
 Tests/Testdaten/*.m4a
 Tests/Testdaten/*.wav

@@ -1,0 +1,89 @@
+#!/bin/bash
+set -euo pipefail
+
+# Wraps `swift build -c release --target KalizapApp` in einer macOS .app-Bundle
+# fuer die Distribution via Homebrew Cask. Output unter dist/.
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_DIR"
+
+if [ ! -f "Sources/KalizapApp/AppSecret.swift" ]; then
+    echo "ERROR: Sources/KalizapApp/AppSecret.swift fehlt."
+    echo "Lauf einmalig: ./Scripts/generate-app-secret.sh"
+    exit 1
+fi
+
+if [ ! -f "Sources/CDeepFilter/lib/libdf.a" ]; then
+    echo "ERROR: Sources/CDeepFilter/lib/libdf.a fehlt (Git-LFS-Asset)."
+    echo "Lauf: git lfs pull"
+    exit 1
+fi
+
+VERSION=$(plutil -extract CFBundleShortVersionString raw Sources/KalizapApp/Info.plist)
+echo "=== Build Kalizap.app v${VERSION} ==="
+echo ""
+
+echo "Step 1/5: swift build -c release --product KalizapApp"
+swift build -c release --product KalizapApp
+
+BUILD_DIR=".build/arm64-apple-macosx/release"
+EXEC="$BUILD_DIR/KalizapApp"
+RESOURCE_BUNDLE="$BUILD_DIR/Kalizap_KalizapApp.bundle"
+
+if [ ! -f "$EXEC" ]; then
+    echo "ERROR: Executable nicht gefunden: $EXEC"
+    exit 1
+fi
+
+if [ ! -d "$RESOURCE_BUNDLE" ]; then
+    echo "ERROR: Resource-Bundle nicht gefunden: $RESOURCE_BUNDLE"
+    exit 1
+fi
+
+echo ""
+echo "Step 2/5: Erstelle Kalizap.app"
+DIST_DIR="dist"
+APP_DIR="$DIST_DIR/Kalizap.app"
+
+mkdir -p "$DIST_DIR"
+rm -rf "$APP_DIR"
+mkdir -p "$APP_DIR/Contents/MacOS"
+mkdir -p "$APP_DIR/Contents/Resources"
+
+cp "$EXEC" "$APP_DIR/Contents/MacOS/Kalizap"
+cp Sources/KalizapApp/Info.plist "$APP_DIR/Contents/Info.plist"
+plutil -replace CFBundleExecutable -string "Kalizap" "$APP_DIR/Contents/Info.plist"
+cp -R "$RESOURCE_BUNDLE" "$APP_DIR/Contents/Resources/"
+
+echo ""
+echo "Step 3/5: Adhoc-Codesignatur"
+# --deep ist deprecated in macOS 11+, fuer eine flache .app-Struktur ohne
+# eingebettete Frameworks aber unkritisch. Adhoc-Sign (Identity "-") reicht
+# fuer Homebrew-Cask-Distribution; Quarantaene wird beim brew-Install
+# automatisch entfernt.
+codesign --force --sign - --deep "$APP_DIR"
+
+echo ""
+echo "Step 4/5: Verifikation"
+codesign --verify --strict "$APP_DIR"
+echo "  Adhoc-Signatur ok"
+
+echo ""
+echo "Step 5/5: ZIP packen"
+ZIP_NAME="Kalizap-${VERSION}.zip"
+ZIP_PATH="$DIST_DIR/$ZIP_NAME"
+
+(cd "$DIST_DIR" && rm -f "$ZIP_NAME" && zip -r -q "$ZIP_NAME" Kalizap.app)
+
+SHA256=$(shasum -a 256 "$ZIP_PATH" | awk '{print $1}')
+
+echo ""
+echo "=== Done ==="
+echo "  App:    $APP_DIR"
+echo "  ZIP:    $ZIP_PATH"
+echo "  SHA256: $SHA256"
+echo ""
+echo "Cask-Update (Tap-Repo Casks/kalizap.rb):"
+echo "  version \"$VERSION\""
+echo "  sha256 \"$SHA256\""
