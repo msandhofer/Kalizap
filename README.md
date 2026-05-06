@@ -1,6 +1,6 @@
 # Kalizap
 
-Native macOS Voice-to-Text App mit lokaler Whisper-Transkription und optionaler Claude-Korrektur. Menu-Bar-App, Hotkey-gesteuert, mit DeepFilterNet3 Rauschunterdrückung.
+Native macOS Voice-to-Text App mit on-device Apple SpeechAnalyzer-Transkription und optionaler Korrektur durch Claude Haiku (Anthropic API). Menu-Bar-App, Hotkey-gesteuert, mit DeepFilterNet3 Rauschunterdrückung.
 
 ## Installation
 
