@@ -1,4 +1,4 @@
-# Qwen3-ASR Evaluation — DerFluesterer Prototyp
+# Qwen3-ASR Evaluation — Kalizap Prototyp
 
 **Datum:** 2026-04-07
 **Modell:** Qwen3-ASR 0.6B MLX 4-bit (`aufklarer/Qwen3-ASR-0.6B-MLX-4bit`)
@@ -10,7 +10,7 @@
 
 ## 1. Zusammenfassung
 
-Qwen3-ASR 0.6B wurde als Prototyp-Backend fuer DerFluisterer evaluiert. Das Modell laeuft on-device via MLX auf Apple Silicon und erreicht ein Real-Time-Factor (RTF) von ~0.07-0.10, was deutlich schneller ist als whisper.cpp (RTF ~0.35 im Vergleich).
+Qwen3-ASR 0.6B wurde als Prototyp-Backend fuer Kalizap evaluiert. Das Modell laeuft on-device via MLX auf Apple Silicon und erreicht ein Real-Time-Factor (RTF) von ~0.07-0.10, was deutlich schneller ist als whisper.cpp (RTF ~0.35 im Vergleich).
 
 ### Kernmetriken
 
@@ -205,7 +205,7 @@ User drueckt Stop:
 
 Wispr Flow ist 100% Cloud-basiert mit ~700ms E2E-Latenz (ASR ~200ms + LLM ~200ms + Netzwerk ~300ms).
 
-| Kriterium | Wispr Flow | DerFluisterer + Qwen3-ASR |
+| Kriterium | Wispr Flow | Kalizap + Qwen3-ASR |
 |-----------|-----------|---------------------------|
 | ASR-Latenz | ~200ms (Cloud-GPU) | ~600ms (on-device, 7s Segment) |
 | LLM Post-Processing | Ja (Llama, Cloud) | Noch nicht implementiert |

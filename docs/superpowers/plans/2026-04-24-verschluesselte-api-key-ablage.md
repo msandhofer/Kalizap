@@ -28,10 +28,10 @@
 
 | Pfad | Verantwortung |
 |---|---|
-| `Sources/DerFluisterer/Services/HardwareIdentityProvider.swift` | Protocol `HardwareIdentityProviding` + Production-Impl (liest `IOPlatformUUID` via IOKit, `NSUserName()` via Foundation) |
-| `Sources/DerFluisterer/Services/EncryptedCredentialStore.swift` | `CredentialStoreProtocol`-Impl: AES-GCM-Ver-/Entschlüsselung, HKDF-Key-Derivation, File-Persistenz |
-| `Sources/DerFluistererApp/AppSecret.swift` | **Gitignored.** 32-Byte Random-Secret als `static let`. Wird per Script einmalig erzeugt. |
-| `Tests/DerFluistererTests/EncryptedCredentialStoreTests.swift` | Roundtrip-, Persistenz-, Mismatch-, Delete-Tests mit Fake-Identity |
+| `Sources/Kalizap/Services/HardwareIdentityProvider.swift` | Protocol `HardwareIdentityProviding` + Production-Impl (liest `IOPlatformUUID` via IOKit, `NSUserName()` via Foundation) |
+| `Sources/Kalizap/Services/EncryptedCredentialStore.swift` | `CredentialStoreProtocol`-Impl: AES-GCM-Ver-/Entschlüsselung, HKDF-Key-Derivation, File-Persistenz |
+| `Sources/KalizapApp/AppSecret.swift` | **Gitignored.** 32-Byte Random-Secret als `static let`. Wird per Script einmalig erzeugt. |
+| `Tests/KalizapTests/EncryptedCredentialStoreTests.swift` | Roundtrip-, Persistenz-, Mismatch-, Delete-Tests mit Fake-Identity |
 | `Scripts/generate-app-secret.sh` | Einmalige Secret-Generierung (scheitert, wenn Datei schon existiert — kein stiller Rotations-Bug) |
 | `docs/build-secret.md` | Operations-Doku: Generieren, Sichern, Verhalten bei Verlust |
 | `docs/security.md` | Öffentliche Security-Dokumentation: Threat-Modell, Design, akzeptierte Trade-offs |
@@ -40,18 +40,18 @@
 
 | Pfad | Änderung |
 |---|---|
-| `Sources/DerFluisterer/Modules/SettingsManager.swift` | Protocol umbenennen: `KeychainServiceProtocol` → `CredentialStoreProtocol`. Parameter-Label `keychain:` → `credentialStore:` in `SettingsManager.init`. |
-| `Sources/DerFluisterer/Services/APIKeyManager.swift` | Parameter-Typ + Label: `keychain: any KeychainServiceProtocol` → `credentialStore: any CredentialStoreProtocol`. Property intern `keychain` → `credentialStore`. |
-| `Sources/DerFluistererApp/DerFluistererApp.swift` | Wiring: `KeychainService()` → `EncryptedCredentialStore(fileURL:identity:appSecret:)` mit Application-Support-Pfad, `ProductionHardwareIdentity()`, `AppSecret.bytes`. |
-| `.gitignore` | Zeile `Sources/DerFluistererApp/AppSecret.swift` hinzufügen. |
+| `Sources/Kalizap/Modules/SettingsManager.swift` | Protocol umbenennen: `KeychainServiceProtocol` → `CredentialStoreProtocol`. Parameter-Label `keychain:` → `credentialStore:` in `SettingsManager.init`. |
+| `Sources/Kalizap/Services/APIKeyManager.swift` | Parameter-Typ + Label: `keychain: any KeychainServiceProtocol` → `credentialStore: any CredentialStoreProtocol`. Property intern `keychain` → `credentialStore`. |
+| `Sources/KalizapApp/KalizapApp.swift` | Wiring: `KeychainService()` → `EncryptedCredentialStore(fileURL:identity:appSecret:)` mit Application-Support-Pfad, `ProductionHardwareIdentity()`, `AppSecret.bytes`. |
+| `.gitignore` | Zeile `Sources/KalizapApp/AppSecret.swift` hinzufügen. |
 | `README.md` | Abschnitt "Build from source" erweitern um Schritt `./Scripts/generate-app-secret.sh` vor erstem Build. |
 
 ### Zu löschende Dateien
 
 | Pfad | Grund |
 |---|---|
-| `Sources/DerFluisterer/Services/KeychainService.swift` | Ersetzt durch `EncryptedCredentialStore` |
-| `Tests/DerFluistererTests/KeychainServiceTests.swift` | Ersetzt durch `EncryptedCredentialStoreTests` |
+| `Sources/Kalizap/Services/KeychainService.swift` | Ersetzt durch `EncryptedCredentialStore` |
+| `Tests/KalizapTests/KeychainServiceTests.swift` | Ersetzt durch `EncryptedCredentialStoreTests` |
 
 ## File-Format der Credentials-Datei
 
@@ -80,7 +80,7 @@ Der `0x00`-Separator verhindert, dass verschiedene Input-Splits denselben konkat
 
 **Files:**
 - Create: `Scripts/generate-app-secret.sh`
-- Create: `Sources/DerFluistererApp/AppSecret.swift` (lokal, gitignored)
+- Create: `Sources/KalizapApp/AppSecret.swift` (lokal, gitignored)
 - Modify: `.gitignore`
 
 - [ ] **Step 1: .gitignore um AppSecret.swift erweitern**
@@ -89,7 +89,7 @@ Datei: `.gitignore` — ans Ende anfügen:
 
 ```
 # Build-Time-Secret für API-Key-Verschlüsselung (siehe docs/build-secret.md)
-Sources/DerFluistererApp/AppSecret.swift
+Sources/KalizapApp/AppSecret.swift
 ```
 
 - [ ] **Step 2: Shell-Script zur Secret-Generierung schreiben**
@@ -98,13 +98,13 @@ Datei: `Scripts/generate-app-secret.sh` (neu, ausführbar):
 
 ```bash
 #!/usr/bin/env bash
-# Generiert einmalig Sources/DerFluistererApp/AppSecret.swift mit 32 Byte Random-Secret.
+# Generiert einmalig Sources/KalizapApp/AppSecret.swift mit 32 Byte Random-Secret.
 # Scheitert hart, wenn die Datei bereits existiert — keine stille Rotation.
 # Siehe docs/build-secret.md.
 
 set -euo pipefail
 
-TARGET="Sources/DerFluistererApp/AppSecret.swift"
+TARGET="Sources/KalizapApp/AppSecret.swift"
 
 if [ -f "$TARGET" ]; then
   echo "FEHLER: $TARGET existiert bereits. Nicht überschrieben." >&2
@@ -135,9 +135,9 @@ Script ausführbar machen: `chmod +x Scripts/generate-app-secret.sh`
 - [ ] **Step 3: Script einmalig ausführen, AppSecret.swift erzeugen**
 
 Run: `./Scripts/generate-app-secret.sh`
-Expected: Ausgabe endet mit `OK: Sources/DerFluistererApp/AppSecret.swift generiert.`
+Expected: Ausgabe endet mit `OK: Sources/KalizapApp/AppSecret.swift generiert.`
 
-Verifikation: `ls -la Sources/DerFluistererApp/AppSecret.swift` zeigt Datei existiert.
+Verifikation: `ls -la Sources/KalizapApp/AppSecret.swift` zeigt Datei existiert.
 
 - [ ] **Step 4: Prüfen, dass Datei gitignored ist**
 
@@ -170,12 +170,12 @@ EOF
 ## Task 1: `HardwareIdentityProviding` — Protokoll und Production-Impl
 
 **Files:**
-- Create: `Sources/DerFluisterer/Services/HardwareIdentityProvider.swift`
+- Create: `Sources/Kalizap/Services/HardwareIdentityProvider.swift`
 - Test: keine dedizierten Tests — Production-Impl ist ein Wrapper über IOKit/Foundation, nicht unit-testbar ohne Hardware. Fake-Impl wird in Task 2+ als inline Helper-Klasse in Tests erstellt und dadurch exerciert.
 
 - [ ] **Step 1: Datei mit Protokoll und Production-Impl schreiben**
 
-Datei: `Sources/DerFluisterer/Services/HardwareIdentityProvider.swift`:
+Datei: `Sources/Kalizap/Services/HardwareIdentityProvider.swift`:
 
 ```swift
 import Foundation
@@ -244,16 +244,16 @@ Noch nicht committen. Wir committen als größeren Block zusammen mit Task 2+, d
 ## Task 2: `EncryptedCredentialStore` — Roundtrip in einer Instanz
 
 **Files:**
-- Create: `Sources/DerFluisterer/Services/EncryptedCredentialStore.swift`
-- Test: `Tests/DerFluistererTests/EncryptedCredentialStoreTests.swift`
+- Create: `Sources/Kalizap/Services/EncryptedCredentialStore.swift`
+- Test: `Tests/KalizapTests/EncryptedCredentialStoreTests.swift`
 
 - [ ] **Step 1: Test-Datei mit Fake-Identity und Roundtrip-Test schreiben**
 
-Datei: `Tests/DerFluistererTests/EncryptedCredentialStoreTests.swift`:
+Datei: `Tests/KalizapTests/EncryptedCredentialStoreTests.swift`:
 
 ```swift
 import XCTest
-@testable import DerFluisterer
+@testable import Kalizap
 
 final class EncryptedCredentialStoreTests: XCTestCase {
 
@@ -309,7 +309,7 @@ Expected: Compile-Fehler `cannot find 'EncryptedCredentialStore' in scope`.
 
 - [ ] **Step 3: Minimale Implementation schreiben**
 
-Datei: `Sources/DerFluisterer/Services/EncryptedCredentialStore.swift`:
+Datei: `Sources/Kalizap/Services/EncryptedCredentialStore.swift`:
 
 ```swift
 import Foundation
@@ -502,7 +502,7 @@ Expected: Test passiert grün.
 ## Task 3: Persistenz-Test über zwei Instanzen
 
 **Files:**
-- Modify: `Tests/DerFluistererTests/EncryptedCredentialStoreTests.swift`
+- Modify: `Tests/KalizapTests/EncryptedCredentialStoreTests.swift`
 
 - [ ] **Step 1: Neuen Test schreiben**
 
@@ -533,7 +533,7 @@ Expected: Passiert grün. (Impl aus Task 2 deckt das bereits ab.)
 ## Task 4: Identity-Mismatch-Test (anderes Device/User → Fehler)
 
 **Files:**
-- Modify: `Tests/DerFluistererTests/EncryptedCredentialStoreTests.swift`
+- Modify: `Tests/KalizapTests/EncryptedCredentialStoreTests.swift`
 
 - [ ] **Step 1: Test schreiben**
 
@@ -590,7 +590,7 @@ Expected: PASS.
 ## Task 5: AppSecret-Mismatch-Test
 
 **Files:**
-- Modify: `Tests/DerFluistererTests/EncryptedCredentialStoreTests.swift`
+- Modify: `Tests/KalizapTests/EncryptedCredentialStoreTests.swift`
 
 - [ ] **Step 1: Test schreiben**
 
@@ -626,7 +626,7 @@ Expected: PASS.
 ## Task 6: retrieve-ohne-store wirft + Overwrite-Test + delete-Test
 
 **Files:**
-- Modify: `Tests/DerFluistererTests/EncryptedCredentialStoreTests.swift`
+- Modify: `Tests/KalizapTests/EncryptedCredentialStoreTests.swift`
 
 - [ ] **Step 1: Tests schreiben**
 
@@ -683,9 +683,9 @@ Expected: **8 Tests grün** (Task 2 + 3 + 4 + 5 + 6 kombiniert = `roundTrip`, `p
 - [ ] **Step 3: Zwischen-Commit (EncryptedCredentialStore fertig, noch nicht verdrahtet)**
 
 ```bash
-git add Sources/DerFluisterer/Services/HardwareIdentityProvider.swift
-git add Sources/DerFluisterer/Services/EncryptedCredentialStore.swift
-git add Tests/DerFluistererTests/EncryptedCredentialStoreTests.swift
+git add Sources/Kalizap/Services/HardwareIdentityProvider.swift
+git add Sources/Kalizap/Services/EncryptedCredentialStore.swift
+git add Tests/KalizapTests/EncryptedCredentialStoreTests.swift
 git commit -m "$(cat <<'EOF'
 feat(#44): EncryptedCredentialStore mit AES-GCM + HKDF
 
@@ -705,13 +705,13 @@ EOF
 ## Task 7: Protocol-Umbenennung `KeychainServiceProtocol` → `CredentialStoreProtocol`
 
 **Files:**
-- Modify: `Sources/DerFluisterer/Modules/SettingsManager.swift`
-- Modify: `Sources/DerFluisterer/Services/APIKeyManager.swift`
-- Modify: `Sources/DerFluisterer/Services/EncryptedCredentialStore.swift`
+- Modify: `Sources/Kalizap/Modules/SettingsManager.swift`
+- Modify: `Sources/Kalizap/Services/APIKeyManager.swift`
+- Modify: `Sources/Kalizap/Services/EncryptedCredentialStore.swift`
 
 - [ ] **Step 1: `SettingsManager.swift` — Protocol umbenennen und Parameter-Label anpassen**
 
-In `Sources/DerFluisterer/Modules/SettingsManager.swift`:
+In `Sources/Kalizap/Modules/SettingsManager.swift`:
 
 **Alt (Zeile ~175):**
 ```swift
@@ -749,7 +749,7 @@ public init(defaults: UserDefaults = .standard, credentialStore: any CredentialS
 
 - [ ] **Step 2: `APIKeyManager.swift` — Parameter-Typ, -Label und interne Property umbenennen**
 
-In `Sources/DerFluisterer/Services/APIKeyManager.swift`:
+In `Sources/Kalizap/Services/APIKeyManager.swift`:
 
 **Alt (Zeile ~19):**
 ```swift
@@ -785,7 +785,7 @@ try credentialStore.delete(for: Self.account)
 
 - [ ] **Step 3: `EncryptedCredentialStore.swift` — temporären Protocol-Typ final umstellen**
 
-In `Sources/DerFluisterer/Services/EncryptedCredentialStore.swift`:
+In `Sources/Kalizap/Services/EncryptedCredentialStore.swift`:
 
 **Alt:**
 ```swift
@@ -804,24 +804,24 @@ public final class EncryptedCredentialStore: CredentialStoreProtocol, @unchecked
 ## Task 8: Altlasten entfernen (KeychainService + Tests)
 
 **Files:**
-- Delete: `Sources/DerFluisterer/Services/KeychainService.swift`
-- Delete: `Tests/DerFluistererTests/KeychainServiceTests.swift`
+- Delete: `Sources/Kalizap/Services/KeychainService.swift`
+- Delete: `Tests/KalizapTests/KeychainServiceTests.swift`
 
 - [ ] **Step 1: Altdateien löschen**
 
 Run:
 ```bash
-rm Sources/DerFluisterer/Services/KeychainService.swift
+rm Sources/Kalizap/Services/KeychainService.swift
 ```
 Run:
 ```bash
-rm Tests/DerFluistererTests/KeychainServiceTests.swift
+rm Tests/KalizapTests/KeychainServiceTests.swift
 ```
 
-- [ ] **Step 2: Build verifizieren — es wird jetzt fehlschlagen am DerFluistererApp, weil der noch `KeychainService()` aufruft**
+- [ ] **Step 2: Build verifizieren — es wird jetzt fehlschlagen am KalizapApp, weil der noch `KeychainService()` aufruft**
 
 Run: `swift build`
-Expected: Fehler in `Sources/DerFluistererApp/DerFluistererApp.swift` — `cannot find 'KeychainService' in scope`.
+Expected: Fehler in `Sources/KalizapApp/KalizapApp.swift` — `cannot find 'KeychainService' in scope`.
 
 Das wird in Task 9 behoben.
 
@@ -830,11 +830,11 @@ Das wird in Task 9 behoben.
 ## Task 9: App-Dependency-Wiring umstellen
 
 **Files:**
-- Modify: `Sources/DerFluistererApp/DerFluistererApp.swift`
+- Modify: `Sources/KalizapApp/KalizapApp.swift`
 
 - [ ] **Step 1: Wiring auf EncryptedCredentialStore umstellen**
 
-In `Sources/DerFluistererApp/DerFluistererApp.swift` den `init()`-Block ersetzen:
+In `Sources/KalizapApp/KalizapApp.swift` den `init()`-Block ersetzen:
 
 **Alt (Zeile 9–22):**
 ```swift
@@ -875,7 +875,7 @@ init() {
 private static func makeCredentialStore() -> EncryptedCredentialStore {
     let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
     let baseDir = appSupport
-        .appendingPathComponent("DerFluisterer", isDirectory: true)
+        .appendingPathComponent("Kalizap", isDirectory: true)
         .appendingPathComponent("credentials", isDirectory: true)
     return EncryptedCredentialStore(
         baseDirectory: baseDir,
@@ -912,7 +912,7 @@ refactor(#44): Protocol-Umbenennung und App-Wiring auf EncryptedCredentialStore
 
 - KeychainServiceProtocol → CredentialStoreProtocol
 - APIKeyManager + SettingsManager: Parameter-Label keychain: → credentialStore:
-- DerFluistererApp: ProductionHardwareIdentity + AppSecret.bytes gewired
+- KalizapApp: ProductionHardwareIdentity + AppSecret.bytes gewired
 - KeychainService.swift + KeychainServiceTests.swift entfernt
 - Tests-Mocks angepasst
 
@@ -929,7 +929,7 @@ EOF
 
 - [ ] **Step 1: App starten**
 
-Run: `swift run DerFluistererApp`
+Run: `swift run KalizapApp`
 Expected: App startet als Menüleisten-App. Menu-Bar-Icon erscheint.
 
 - [ ] **Step 2: API-Key in Settings eintragen**
@@ -938,15 +938,15 @@ Settings-Fenster öffnen (Cmd+, oder Menü). API-Key eintragen (Wert: ein gülti
 
 - [ ] **Step 3: Datei im Filesystem prüfen**
 
-Run: `ls -la "$HOME/Library/Application Support/DerFluisterer/credentials/"`
+Run: `ls -la "$HOME/Library/Application Support/Kalizap/credentials/"`
 Expected: Datei `anthropic-api-key.enc` existiert, ~80 Byte, `rw-------` (600).
 
-Run: `file "$HOME/Library/Application Support/DerFluisterer/credentials/anthropic-api-key.enc"`
+Run: `file "$HOME/Library/Application Support/Kalizap/credentials/anthropic-api-key.enc"`
 Expected: `data` (binäres Format, keine erkennbare Struktur).
 
 - [ ] **Step 4: Datei-Inhalt grob sichten (kein Klartext-Key)**
 
-Run: `hexdump -C "$HOME/Library/Application Support/DerFluisterer/credentials/anthropic-api-key.enc" | head`
+Run: `hexdump -C "$HOME/Library/Application Support/Kalizap/credentials/anthropic-api-key.enc" | head`
 Expected: Zufällig aussehende Bytes. **Keine** Zeichenfolge `sk-ant-…` erkennbar.
 
 - [ ] **Step 5: App beenden**
@@ -955,7 +955,7 @@ Im Menü "Beenden" klicken oder `Cmd+Q` aus Settings-Fenster.
 
 - [ ] **Step 6: App erneut starten**
 
-Run: `swift run DerFluistererApp`
+Run: `swift run KalizapApp`
 Expected: App startet, Key ist weiterhin eingespeichert (in Settings sichtbar oder durch ersten Korrektur-Test prüfbar).
 
 - [ ] **Step 7: Optional — Diktat-Test**
@@ -968,7 +968,7 @@ Hotkey halten, sprechen, loslassen. Korrektur landet im Editor. → API-Key wird
 
 Da Migration bewusst nicht implementiert wurde (User tippt neu ein): alten Keychain-Eintrag manuell entfernen:
 
-Run: `security delete-generic-password -s "com.derfluisterer" -a "anthropic-api-key" 2>&1 || echo "(keine Altdaten)"`
+Run: `security delete-generic-password -s "com.kalizap" -a "anthropic-api-key" 2>&1 || echo "(keine Altdaten)"`
 Expected: `password has been deleted.` oder `(keine Altdaten)`.
 
 ---
@@ -991,13 +991,13 @@ Dieses Dokument richtet sich an Mitwirkende und an den Projekt-Maintainer.
 
 ## Zweck
 
-Das App-Secret ist ein zufälliges 32-Byte-Wert, das beim Build in das Binary einkompiliert wird. Es fließt zusammen mit `IOPlatformUUID` und `NSUserName()` in die HKDF-Key-Derivation der verschlüsselten Credentials-Datei ein (`~/Library/Application Support/DerFluisterer/credentials/<account>.enc`).
+Das App-Secret ist ein zufälliges 32-Byte-Wert, das beim Build in das Binary einkompiliert wird. Es fließt zusammen mit `IOPlatformUUID` und `NSUserName()` in die HKDF-Key-Derivation der verschlüsselten Credentials-Datei ein (`~/Library/Application Support/Kalizap/credentials/<account>.enc`).
 
 Genaue Funktionsweise und Bedrohungsmodell: siehe [security.md](security.md).
 
 ## Speicherort
 
-- **Pfad:** `Sources/DerFluistererApp/AppSecret.swift`
+- **Pfad:** `Sources/KalizapApp/AppSecret.swift`
 - **Gitignore-Status:** ignoriert (siehe `.gitignore`)
 - **Format:** Swift-Datei mit einem `enum AppSecret { static let bytes: Data = ... }`
 
@@ -1023,7 +1023,7 @@ Warum: Bei Verlust des Secrets können alle bestehenden Release-Nutzer ihre vers
 
 Nur im echten Kompromittierungsfall. Folgen:
 
-1. `rm Sources/DerFluistererApp/AppSecret.swift`
+1. `rm Sources/KalizapApp/AppSecret.swift`
 2. `./Scripts/generate-app-secret.sh`
 3. Neues Release bauen.
 4. Release-Notes: "Alle Nutzer müssen ihren API-Key neu eintragen."
@@ -1139,8 +1139,8 @@ In `README.md` einen Abschnitt "Build from source" ergänzen (falls noch nicht v
 Voraussetzungen: Xcode 15+ / Swift 6.2, macOS 26+.
 
 ```bash
-git clone https://github.com/msandhofer/Fluesterclon.git
-cd Fluesterclon
+git clone https://github.com/msandhofer/Kalizap.git
+cd Kalizap
 git lfs pull                           # DeepFilterNet-Modell laden
 ./Scripts/generate-app-secret.sh       # einmalig: App-Secret für API-Key-Verschlüsselung
 swift build -c release
@@ -1199,11 +1199,11 @@ Die im Ticket vorgesehenen Optionen A–E wurden unter der Randbedingung "unsign
 
 ### Finale Lösung
 
-AES-GCM-verschlüsselte Datei unter `~/Library/Application Support/DerFluisterer/credentials/<account>.enc`, Schlüssel via HKDF-SHA256 aus:
+AES-GCM-verschlüsselte Datei unter `~/Library/Application Support/Kalizap/credentials/<account>.enc`, Schlüssel via HKDF-SHA256 aus:
 
 - `IOPlatformUUID` (Gerätebindung)
 - `NSUserName()` (Account-Bindung, niedrige Entropie, aber kostenlos)
-- Build-Time-injiziertes App-Secret (gitignored in `Sources/DerFluistererApp/AppSecret.swift`)
+- Build-Time-injiziertes App-Secret (gitignored in `Sources/KalizapApp/AppSecret.swift`)
 
 Pro Schreibvorgang random Salt (32 Byte) → identische Inputs ergeben unterschiedliche Ciphertexte.
 
@@ -1259,7 +1259,7 @@ Run: `gh issue view 44 --comments` — Kommentar-ID der letzten Nachricht notier
 
 Run (mit echter ID):
 ```bash
-gh api -X PATCH repos/msandhofer/Fluesterclon/issues/comments/<COMMENT_ID> -f body="..."
+gh api -X PATCH repos/msandhofer/Kalizap/issues/comments/<COMMENT_ID> -f body="..."
 ```
 
 Oder einfacher: vor `gh issue comment` die echten Hashes aus `git log --oneline -5` einsetzen, dann posten.
@@ -1271,7 +1271,7 @@ Expected: Issue-State auf `closed`.
 
 - [ ] **Step 4: Memory aktualisieren**
 
-Datei: `/Users/msa/.claude/projects/-Users-msa-Library-CloudStorage-OneDrive-SandhoferConsulting-30-Lernen-KI-project-fluesterclon/memory/project_fluesterclon.md`:
+Datei: `/Users/msa/.claude/projects/-Users-msa-Library-CloudStorage-OneDrive-SandhoferConsulting-30-Lernen-KI-project-kalizap/memory/project_kalizap.md`:
 
 Ersetze die Zeile
 ```
@@ -1291,10 +1291,10 @@ Offene Issues reduziert sich auf 4 (#1, #46, #47, #48).
 - [ ] Build (`swift build`) grün
 - [ ] Tests (`swift test`) grün — alle bestehenden + 9 neue EncryptedCredentialStore-Tests
 - [ ] Manuelle Verifikation erfolgreich (App-Start → Key-Eingabe → Restart → Datei im FS → Key wieder nutzbar)
-- [ ] Datei `~/Library/Application Support/DerFluisterer/credentials/anthropic-api-key.enc` existiert, `0600`, binär ohne erkennbares Klartext-Muster
+- [ ] Datei `~/Library/Application Support/Kalizap/credentials/anthropic-api-key.enc` existiert, `0600`, binär ohne erkennbares Klartext-Muster
 - [ ] Alter Keychain-Eintrag entfernt (per `security delete-generic-password`)
 - [ ] `AppSecret.swift` liegt NICHT im Git (`git status` sauber, `git log` enthält keine Referenz)
 - [ ] `docs/build-secret.md`, `docs/security.md` vorhanden
 - [ ] README um Build-Schritt erweitert
 - [ ] Ticket #44 mit Evaluations-/Umsetzungs-Kommentar geschlossen
-- [ ] Memory `project_fluesterclon.md` aktualisiert
+- [ ] Memory `project_kalizap.md` aktualisiert

@@ -64,7 +64,7 @@ SpectrumView   SpectrumOverlayWindow
 
 ### Neue Komponenten
 
-**`AudioSpectrumCalculator` (Sources/DerFluisterer/Services/)**
+**`AudioSpectrumCalculator` (Sources/Kalizap/Services/)**
 - `static func calculate(from samples: [Float], sampleRate: Int) -> [Float]`
 - Hann-Window, Real-to-Complex FFT via `vDSP` (Accelerate.framework)
 - Magnituden werden auf 20 Frequenzbänder logarithmisch gruppiert (80 Hz – 8 kHz)
@@ -72,14 +72,14 @@ SpectrumView   SpectrumOverlayWindow
 - FFT-Setup wird einmal im Initialisierer erstellt und gecached (SIMD-optimiert)
 - Reine Funktion, synchron, testbar ohne Audio-Hardware
 
-**`SpectrumView` (Sources/DerFluistererApp/Views/)**
+**`SpectrumView` (Sources/KalizapApp/Views/)**
 - `let bands: [Float]` (20 Werte, erwartet Werte in `[0, 1]`)
 - `let barCount: Int` (default 20)
 - `let height: CGFloat` (default 22 für Overlay, 20 für Popover)
 - Rendert 20 `RoundedRectangle`-Balken mit Höhe proportional zum Band-Wert
 - Ersetzt die bestehende defekte `WaveformView`
 
-**`SpectrumOverlayWindow` (Sources/DerFluistererApp/)**
+**`SpectrumOverlayWindow` (Sources/KalizapApp/)**
 - `@MainActor enum SpectrumOverlayWindow` (analog zu `ToastWindow`)
 - `static func show(bandsBinding: ...)` — öffnet NSPanel mit `SpectrumView`
 - `static func hide()` — Fade-out
@@ -123,7 +123,7 @@ SpectrumView   SpectrumOverlayWindow
 
 ## Testing
 
-**Unit-Tests** (`Tests/DerFluistererTests/AudioSpectrumCalculatorTests.swift`, neu)
+**Unit-Tests** (`Tests/KalizapTests/AudioSpectrumCalculatorTests.swift`, neu)
 - `calculate` gibt bei leeren Samples 20 Nullen zurück
 - Sinus bei 440 Hz produziert Peak im erwarteten Frequenzband
 - Weißes Rauschen produziert ungefähr gleichverteilte Bänder

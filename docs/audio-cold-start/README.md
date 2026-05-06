@@ -18,7 +18,7 @@ Dokumentation des Audio-Cold-Start-Problems auf macOS (Apple Silicon), der Reche
 
 ## 1. Empirische Messungen (eigene Logs, 2026-04-22)
 
-Instrumentierung in `DictationPipeline.handleStart`, `AudioQueueAdapter.startCapture`, `SpectrumOverlayWindow.show`. Verbose-Logging via `--verbose-log` in `/var/folders/…/T/derfluesterer-debug.log`.
+Instrumentierung in `DictationPipeline.handleStart`, `AudioQueueAdapter.startCapture`, `SpectrumOverlayWindow.show`. Verbose-Logging via `--verbose-log` in `/var/folders/…/T/kalizap-debug.log`.
 
 | Lauf | Szenario | `handleStart` TOTAL | `playStartSound` | `recorder.startRecording` | `overlay.show` | First spectrumBands |
 |------|---|---|---|---|---|---|
@@ -144,7 +144,7 @@ Sechs parallele Agent-Recherchen haben verschiedene Lösungsrichtungen untersuch
 
 ### Umsetzungs-Details
 
-1. **Neue Klasse `SystemAudioActivityMonitor`** (in `DerFluisterer/Services/`):
+1. **Neue Klasse `SystemAudioActivityMonitor`** (in `Kalizap/Services/`):
    - Protocol `AudioActivityMonitoring` mit `isAudioWarm() -> Bool`
    - **Listener-basiert** via `AudioObjectAddPropertyListenerBlock` auf `kAudioDevicePropertyDeviceIsRunningSomewhere` des Default Output Device
    - Interner `AudioActivityState` (pure struct, testbar) pflegt:

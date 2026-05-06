@@ -38,7 +38,7 @@ let testTexts: [(name: String, text: String)] = [
     ("long", "Jetzt erfind ich mal wieder einen Text. Der wird aber nicht so lange sein, sondern ich werde einfach irgendwas erfinden aus meinem Kopf heraus. Z.B. was in der Bibliothek heute fuer Buecher gefunden werden, die ich dann am Schreibtisch sitzend lesen werde. Meine Brille ist dabei ganz schoen verrutscht und verwackelt, darum werden die Buchstaben ganz schoen unscharf fuer mich sein."),
 ]
 
-let projectRoot = "/Users/msa/Library/CloudStorage/OneDrive-SandhoferConsulting/30 Lernen/KI/project/fluesterclon"
+let projectRoot = FileManager.default.currentDirectoryPath
 let screenshotDir = projectRoot + "/Tools/InsertDelayScreenshotTest/screenshots"
 
 // MARK: - Window Capture

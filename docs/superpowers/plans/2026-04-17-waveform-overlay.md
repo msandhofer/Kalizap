@@ -15,30 +15,30 @@
 ## File Structure
 
 **Create:**
-- `Sources/DerFluisterer/Services/AudioSpectrumCalculator.swift` — pure FFT → 20 log-Bänder (stateful wegen vDSP-Setup-Cache)
-- `Sources/DerFluistererApp/Views/SpectrumView.swift` — SwiftUI-Balken-View
-- `Sources/DerFluistererApp/SpectrumOverlayWindow.swift` — floating NSPanel
-- `Tests/DerFluistererTests/AudioSpectrumCalculatorTests.swift` — Unit-Tests für FFT
+- `Sources/Kalizap/Services/AudioSpectrumCalculator.swift` — pure FFT → 20 log-Bänder (stateful wegen vDSP-Setup-Cache)
+- `Sources/KalizapApp/Views/SpectrumView.swift` — SwiftUI-Balken-View
+- `Sources/KalizapApp/SpectrumOverlayWindow.swift` — floating NSPanel
+- `Tests/KalizapTests/AudioSpectrumCalculatorTests.swift` — Unit-Tests für FFT
 
 **Modify:**
-- `Sources/DerFluisterer/Modules/AudioRecorder.swift` — neues Protokoll `AudioSpectrumProvider`, `AudioRecording` inkludiert es
-- `Sources/DerFluisterer/Services/AudioRecorderImpl.swift` — `spectrumStream`-Continuation, `onSpectrum`-Callback im Adapter
-- `Sources/DerFluisterer/Modules/DictationPipeline.swift` — `spectrumBands` + `spectrumTask`, `SpectrumOverlayPresenting`-Dependency, Show/Hide in handleStart/handleStop/shutdown
-- `Sources/DerFluistererApp/PipelineFactory.swift` — `SpectrumOverlayWindow` als Overlay-Presenter injizieren
-- `Sources/DerFluistererApp/Views/MenuBarView.swift` — `WaveformView` → `SpectrumView`
-- `Sources/DerFluisterer/Modules/RecordingViewModel.swift` — `waveformLevels` + `updateLevel` + `maxBars` entfernen (RecordingViewModel selbst bleibt wegen RecordingCoordinator)
-- `Tests/DerFluistererTests/RecordingViewModelTests.swift` — Tests für `updateLevel`/`waveformLevels` entfernen
+- `Sources/Kalizap/Modules/AudioRecorder.swift` — neues Protokoll `AudioSpectrumProvider`, `AudioRecording` inkludiert es
+- `Sources/Kalizap/Services/AudioRecorderImpl.swift` — `spectrumStream`-Continuation, `onSpectrum`-Callback im Adapter
+- `Sources/Kalizap/Modules/DictationPipeline.swift` — `spectrumBands` + `spectrumTask`, `SpectrumOverlayPresenting`-Dependency, Show/Hide in handleStart/handleStop/shutdown
+- `Sources/KalizapApp/PipelineFactory.swift` — `SpectrumOverlayWindow` als Overlay-Presenter injizieren
+- `Sources/KalizapApp/Views/MenuBarView.swift` — `WaveformView` → `SpectrumView`
+- `Sources/Kalizap/Modules/RecordingViewModel.swift` — `waveformLevels` + `updateLevel` + `maxBars` entfernen (RecordingViewModel selbst bleibt wegen RecordingCoordinator)
+- `Tests/KalizapTests/RecordingViewModelTests.swift` — Tests für `updateLevel`/`waveformLevels` entfernen
 
 **Delete:**
-- `Sources/DerFluistererApp/Views/WaveformView.swift`
+- `Sources/KalizapApp/Views/WaveformView.swift`
 
 ---
 
 ## Task 1: AudioSpectrumCalculator (FFT + log-Bänder, pure)
 
 **Files:**
-- Create: `Sources/DerFluisterer/Services/AudioSpectrumCalculator.swift`
-- Test: `Tests/DerFluistererTests/AudioSpectrumCalculatorTests.swift`
+- Create: `Sources/Kalizap/Services/AudioSpectrumCalculator.swift`
+- Test: `Tests/KalizapTests/AudioSpectrumCalculatorTests.swift`
 
 Design-Constraints:
 - FFT-Länge fix: 1024 Samples. Input < 1024 → zero-pad. Input > 1024 → letzte 1024 Samples (neueste)
@@ -51,12 +51,12 @@ Design-Constraints:
 
 ### Step 1.1: Failing Tests schreiben
 
-- [ ] Datei `Tests/DerFluistererTests/AudioSpectrumCalculatorTests.swift`:
+- [ ] Datei `Tests/KalizapTests/AudioSpectrumCalculatorTests.swift`:
 
 ```swift
 import Testing
 import Foundation
-@testable import DerFluisterer
+@testable import Kalizap
 
 @Suite("AudioSpectrumCalculator")
 struct AudioSpectrumCalculatorTests {
@@ -151,7 +151,7 @@ struct AudioSpectrumCalculatorTests {
 
 ### Step 1.3: AudioSpectrumCalculator implementieren
 
-- [ ] Datei `Sources/DerFluisterer/Services/AudioSpectrumCalculator.swift`:
+- [ ] Datei `Sources/Kalizap/Services/AudioSpectrumCalculator.swift`:
 
 ```swift
 import Foundation
@@ -300,7 +300,7 @@ public final class AudioSpectrumCalculator: @unchecked Sendable {
 - [ ] Run:
 
 ```bash
-git add Sources/DerFluisterer/Services/AudioSpectrumCalculator.swift Tests/DerFluistererTests/AudioSpectrumCalculatorTests.swift
+git add Sources/Kalizap/Services/AudioSpectrumCalculator.swift Tests/KalizapTests/AudioSpectrumCalculatorTests.swift
 git commit -m "feat(#38): AudioSpectrumCalculator fuer FFT-basierte Frequenzbaender"
 ```
 
@@ -309,11 +309,11 @@ git commit -m "feat(#38): AudioSpectrumCalculator fuer FFT-basierte Frequenzbaen
 ## Task 2: AudioSpectrumProvider-Protokoll
 
 **Files:**
-- Modify: `Sources/DerFluisterer/Modules/AudioRecorder.swift`
+- Modify: `Sources/Kalizap/Modules/AudioRecorder.swift`
 
 ### Step 2.1: Protokoll hinzufügen
 
-- [ ] In `Sources/DerFluisterer/Modules/AudioRecorder.swift` nach dem `AudioLevelMetering`-Protokoll (nach Zeile 65) einfügen:
+- [ ] In `Sources/Kalizap/Modules/AudioRecorder.swift` nach dem `AudioLevelMetering`-Protokoll (nach Zeile 65) einfügen:
 
 ```swift
 public protocol AudioSpectrumProviding: AnyObject, Sendable {
@@ -340,7 +340,7 @@ public protocol AudioRecording: AudioCapturing, AudioLevelMetering, AudioSpectru
 ## Task 3: AudioRecorderImpl — spectrumStream integrieren
 
 **Files:**
-- Modify: `Sources/DerFluisterer/Services/AudioRecorderImpl.swift`
+- Modify: `Sources/Kalizap/Services/AudioRecorderImpl.swift`
 
 ### Step 3.1: Stream + Continuation in der Klasse anlegen
 
@@ -436,7 +436,7 @@ public protocol AudioRecording: AudioCapturing, AudioLevelMetering, AudioSpectru
 - [ ] Run:
 
 ```bash
-git add Sources/DerFluisterer/Modules/AudioRecorder.swift Sources/DerFluisterer/Services/AudioRecorderImpl.swift
+git add Sources/Kalizap/Modules/AudioRecorder.swift Sources/Kalizap/Services/AudioRecorderImpl.swift
 git commit -m "feat(#38): AudioSpectrumProviding + spectrumStream im AudioRecorder"
 ```
 
@@ -445,11 +445,11 @@ git commit -m "feat(#38): AudioSpectrumProviding + spectrumStream im AudioRecord
 ## Task 4: DictationPipeline — Spektrum konsumieren + Overlay-Hook
 
 **Files:**
-- Modify: `Sources/DerFluisterer/Modules/DictationPipeline.swift`
+- Modify: `Sources/Kalizap/Modules/DictationPipeline.swift`
 
 ### Step 4.1: SpectrumOverlayPresenting-Protokoll definieren
 
-- [ ] In `Sources/DerFluisterer/Modules/DictationPipeline.swift`, direkt unter `private let logger = Logger(...)` (nach Zeile 11) einfügen:
+- [ ] In `Sources/Kalizap/Modules/DictationPipeline.swift`, direkt unter `private let logger = Logger(...)` (nach Zeile 11) einfügen:
 
 ```swift
 /// Kleines Kontrakt für einen Overlay-Presenter, den die Pipeline beim
@@ -566,13 +566,13 @@ public protocol SpectrumOverlayPresenting: AnyObject {
 
 ### Step 4.6: PipelineFactory anpassen
 
-- [ ] In `Sources/DerFluistererApp/PipelineFactory.swift` die `PipelineDependencies(...)`-Erzeugung suchen und den `recorder` zweifach als `spectrumProvider` übergeben (der `AudioRecorderImpl` implementiert beides):
+- [ ] In `Sources/KalizapApp/PipelineFactory.swift` die `PipelineDependencies(...)`-Erzeugung suchen und den `recorder` zweifach als `spectrumProvider` übergeben (der `AudioRecorderImpl` implementiert beides):
   - `metering: recorder,` Zeile suchen → direkt darunter ergänzen: `spectrumProvider: recorder,`
   - `overlayPresenter: SpectrumOverlayWindow.shared,` — **ACHTUNG:** `SpectrumOverlayWindow.shared` existiert erst nach Task 7. In dieser Task nur `overlayPresenter: nil,` eintragen oder den Parameter weglassen (Default ist nil).
 
 ### Step 4.7: Tests anpassen
 
-- [ ] `Tests/DerFluistererTests/TestHelpers.swift` lesen und prüfen, ob es dort einen `PipelineDependencies(...)`-Konstruktor-Helper gibt. Falls ja: `spectrumProvider`-Parameter hinzufügen. Falls nicht direkt dort, dann in allen Stellen die `PipelineDependencies(...)` aufrufen.
+- [ ] `Tests/KalizapTests/TestHelpers.swift` lesen und prüfen, ob es dort einen `PipelineDependencies(...)`-Konstruktor-Helper gibt. Falls ja: `spectrumProvider`-Parameter hinzufügen. Falls nicht direkt dort, dann in allen Stellen die `PipelineDependencies(...)` aufrufen.
   - Mock einen `MockAudioSpectrumProvider`:
 
 ```swift
@@ -609,7 +609,7 @@ final class MockAudioSpectrumProvider: AudioSpectrumProviding, @unchecked Sendab
 - [ ] Run:
 
 ```bash
-git add Sources/DerFluisterer/Modules/DictationPipeline.swift Sources/DerFluistererApp/PipelineFactory.swift Tests/DerFluistererTests/
+git add Sources/Kalizap/Modules/DictationPipeline.swift Sources/KalizapApp/PipelineFactory.swift Tests/KalizapTests/
 git commit -m "feat(#38): DictationPipeline konsumiert spectrumStream + Overlay-Hook"
 ```
 
@@ -618,11 +618,11 @@ git commit -m "feat(#38): DictationPipeline konsumiert spectrumStream + Overlay-
 ## Task 5: SpectrumView (SwiftUI-Balken)
 
 **Files:**
-- Create: `Sources/DerFluistererApp/Views/SpectrumView.swift`
+- Create: `Sources/KalizapApp/Views/SpectrumView.swift`
 
 ### Step 5.1: View schreiben
 
-- [ ] Datei `Sources/DerFluistererApp/Views/SpectrumView.swift`:
+- [ ] Datei `Sources/KalizapApp/Views/SpectrumView.swift`:
 
 ```swift
 import SwiftUI
@@ -692,7 +692,7 @@ struct SpectrumView: View {
 - [ ] Run:
 
 ```bash
-git add Sources/DerFluistererApp/Views/SpectrumView.swift
+git add Sources/KalizapApp/Views/SpectrumView.swift
 git commit -m "feat(#38): SpectrumView rendert FFT-Baender als SwiftUI-Balken"
 ```
 
@@ -701,11 +701,11 @@ git commit -m "feat(#38): SpectrumView rendert FFT-Baender als SwiftUI-Balken"
 ## Task 6: MenuBarView auf SpectrumView umstellen
 
 **Files:**
-- Modify: `Sources/DerFluistererApp/Views/MenuBarView.swift`
+- Modify: `Sources/KalizapApp/Views/MenuBarView.swift`
 
 ### Step 6.1: RecordingStatusView anpassen
 
-- [ ] In `Sources/DerFluistererApp/Views/MenuBarView.swift`, Zeile 171–181 (`RecordingStatusView`), ersetzen:
+- [ ] In `Sources/KalizapApp/Views/MenuBarView.swift`, Zeile 171–181 (`RecordingStatusView`), ersetzen:
 
 ```swift
 private struct RecordingStatusView: View {
@@ -742,7 +742,7 @@ private struct RecordingStatusView: View {
 - [ ] Run:
 
 ```bash
-git add Sources/DerFluistererApp/Views/MenuBarView.swift
+git add Sources/KalizapApp/Views/MenuBarView.swift
 git commit -m "feat(#38): MenuBar-Popover nutzt SpectrumView statt WaveformView"
 ```
 
@@ -751,16 +751,16 @@ git commit -m "feat(#38): MenuBar-Popover nutzt SpectrumView statt WaveformView"
 ## Task 7: SpectrumOverlayWindow (floating NSPanel)
 
 **Files:**
-- Create: `Sources/DerFluistererApp/SpectrumOverlayWindow.swift`
+- Create: `Sources/KalizapApp/SpectrumOverlayWindow.swift`
 
 ### Step 7.1: Fenster implementieren
 
-- [ ] Datei `Sources/DerFluistererApp/SpectrumOverlayWindow.swift`:
+- [ ] Datei `Sources/KalizapApp/SpectrumOverlayWindow.swift`:
 
 ```swift
 import AppKit
 import SwiftUI
-import DerFluisterer
+import Kalizap
 
 /// Schwebendes Overlay oben Mitte mit einem animierten Frequenz-Spektrum.
 /// Wird durch DictationPipeline über das SpectrumOverlayPresenting-Protokoll
@@ -846,7 +846,7 @@ private struct SpectrumOverlayContent: View {
 - [ ] Run:
 
 ```bash
-git add Sources/DerFluistererApp/SpectrumOverlayWindow.swift
+git add Sources/KalizapApp/SpectrumOverlayWindow.swift
 git commit -m "feat(#38): SpectrumOverlayWindow — floating NSPanel oben Mitte"
 ```
 
@@ -855,11 +855,11 @@ git commit -m "feat(#38): SpectrumOverlayWindow — floating NSPanel oben Mitte"
 ## Task 8: Overlay-Presenter in PipelineFactory verdrahten
 
 **Files:**
-- Modify: `Sources/DerFluistererApp/PipelineFactory.swift`
+- Modify: `Sources/KalizapApp/PipelineFactory.swift`
 
 ### Step 8.1: overlayPresenter zuweisen
 
-- [ ] In `Sources/DerFluistererApp/PipelineFactory.swift` die `PipelineDependencies(...)`-Erzeugung: wo in Task 4 `overlayPresenter: nil,` stand, durch:
+- [ ] In `Sources/KalizapApp/PipelineFactory.swift` die `PipelineDependencies(...)`-Erzeugung: wo in Task 4 `overlayPresenter: nil,` stand, durch:
 
 ```swift
             overlayPresenter: SpectrumOverlayWindow.shared,
@@ -880,7 +880,7 @@ ersetzen. (Falls der Parameter weggelassen wurde: hinzufügen.)
 - [ ] Run:
 
 ```bash
-git add Sources/DerFluistererApp/PipelineFactory.swift
+git add Sources/KalizapApp/PipelineFactory.swift
 git commit -m "feat(#38): SpectrumOverlayWindow als Presenter in Pipeline einhaengen"
 ```
 
@@ -889,21 +889,21 @@ git commit -m "feat(#38): SpectrumOverlayWindow als Presenter in Pipeline einhae
 ## Task 9: Altlasten aufräumen (WaveformView, RecordingViewModel-Waveform)
 
 **Files:**
-- Delete: `Sources/DerFluistererApp/Views/WaveformView.swift`
-- Modify: `Sources/DerFluisterer/Modules/RecordingViewModel.swift`
-- Modify: `Tests/DerFluistererTests/RecordingViewModelTests.swift`
+- Delete: `Sources/KalizapApp/Views/WaveformView.swift`
+- Modify: `Sources/Kalizap/Modules/RecordingViewModel.swift`
+- Modify: `Tests/KalizapTests/RecordingViewModelTests.swift`
 
 ### Step 9.1: WaveformView löschen
 
 - [ ] Run:
 
 ```bash
-rm "Sources/DerFluistererApp/Views/WaveformView.swift"
+rm "Sources/KalizapApp/Views/WaveformView.swift"
 ```
 
 ### Step 9.2: RecordingViewModel aufräumen
 
-- [ ] `Sources/DerFluisterer/Modules/RecordingViewModel.swift` vollständig ersetzen durch:
+- [ ] `Sources/Kalizap/Modules/RecordingViewModel.swift` vollständig ersetzen durch:
 
 ```swift
 import Foundation
@@ -935,7 +935,7 @@ public final class RecordingViewModel {
 
 ### Step 9.3: Tests aufräumen
 
-- [ ] `Tests/DerFluistererTests/RecordingViewModelTests.swift` öffnen und alle `@Test`-Methoden entfernen, die `waveformLevels`, `updateLevel`, `maxWaveformBars` oder `maxBars` referenzieren. Die übrigen Tests (startRecording/stopRecording/menuBarIcon) bleiben erhalten.
+- [ ] `Tests/KalizapTests/RecordingViewModelTests.swift` öffnen und alle `@Test`-Methoden entfernen, die `waveformLevels`, `updateLevel`, `maxWaveformBars` oder `maxBars` referenzieren. Die übrigen Tests (startRecording/stopRecording/menuBarIcon) bleiben erhalten.
 
 - [ ] Falls Tests `RecordingViewModel(maxWaveformBars: 3)` aufrufen: durch `RecordingViewModel()` ersetzen.
 
@@ -952,8 +952,8 @@ public final class RecordingViewModel {
 - [ ] Run:
 
 ```bash
-git add Sources/DerFluisterer/Modules/RecordingViewModel.swift Tests/DerFluistererTests/RecordingViewModelTests.swift
-git rm Sources/DerFluistererApp/Views/WaveformView.swift
+git add Sources/Kalizap/Modules/RecordingViewModel.swift Tests/KalizapTests/RecordingViewModelTests.swift
+git rm Sources/KalizapApp/Views/WaveformView.swift
 git commit -m "refactor(#38): WaveformView + tote waveformLevels-Logik entfernen"
 ```
 
@@ -966,7 +966,7 @@ git commit -m "refactor(#38): WaveformView + tote waveformLevels-Logik entfernen
 
 ### Step 10.1: App starten
 
-- [ ] Run: `swift run DerFluistererApp`
+- [ ] Run: `swift run KalizapApp`
   Oder im Xcode: Build & Run
 
 ### Step 10.2: Manueller Test-Durchlauf

@@ -16,6 +16,9 @@ Sources/KalizapApp/AppSecret.swift
 # API-Keys und Secrets für Dev-Tools (PromptJailbreakTest etc.)
 .env
 
+# Lokale Test-Output-Dateien
+Tools/InsertDelayScreenshotTest/screenshots/
+
 # Lokale Testaufnahmen (nicht committen — biometrische Daten, Privacy)
 Tests/Testdaten/*.m4a
 Tests/Testdaten/*.wav

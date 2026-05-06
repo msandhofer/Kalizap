@@ -166,7 +166,7 @@ Create `Tools/WhisperCppTestCLI/Commands/StreamWhisperCommand.swift`:
 
 ```swift
 import Foundation
-import DerFluisterer
+import Kalizap
 import STTTestCommon
 
 // MARK: - Simulation Result (internal)
@@ -659,7 +659,7 @@ Create `Tools/WhisperCppTestCLI/Commands/SweepWhisperCommand.swift`:
 
 ```swift
 import Foundation
-import DerFluisterer
+import Kalizap
 import STTTestCommon
 
 func runSweepWhisperMode(args: SweepWhisperArgs) async throws {

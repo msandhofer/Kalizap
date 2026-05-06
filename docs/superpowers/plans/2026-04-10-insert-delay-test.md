@@ -4,9 +4,9 @@
 
 **Goal:** Automated test tool to find the minimum safe `restoreDelay` for clipboard-based text insertion.
 
-**Architecture:** New CLI target `InsertDelayTest` depending on `DerFluisterer` (reuses existing clipboard/keystroke code). Iterates over delay values and text lengths, verifies pasted text via AppleScript, outputs JSON report with recommendation.
+**Architecture:** New CLI target `InsertDelayTest` depending on `Kalizap` (reuses existing clipboard/keystroke code). Iterates over delay values and text lengths, verifies pasted text via AppleScript, outputs JSON report with recommendation.
 
-**Tech Stack:** Swift, AppKit (NSPasteboard, NSAppleScript, CGEvent), DerFluisterer module
+**Tech Stack:** Swift, AppKit (NSPasteboard, NSAppleScript, CGEvent), Kalizap module
 
 ---
 
@@ -23,7 +23,7 @@ Add after the ToastTestCLI target (line 103):
 ```swift
         .executableTarget(
             name: "InsertDelayTest",
-            dependencies: ["DerFluisterer"],
+            dependencies: ["Kalizap"],
             path: "Tools/InsertDelayTest"
         ),
 ```
@@ -34,7 +34,7 @@ Create `Tools/InsertDelayTest/main.swift`:
 
 ```swift
 import Foundation
-import DerFluisterer
+import Kalizap
 
 print("=== Insert Delay Test ===")
 print("Ermittelt den minimalen sicheren restoreDelay.")
@@ -69,7 +69,7 @@ Create `Tools/InsertDelayTest/InsertDelayTester.swift`:
 import Foundation
 import AppKit
 import CoreGraphics
-import DerFluisterer
+import Kalizap
 
 // MARK: - Types
 
@@ -270,7 +270,7 @@ Replace `Tools/InsertDelayTest/main.swift`:
 
 ```swift
 import Foundation
-import DerFluisterer
+import Kalizap
 
 // MARK: - Argument Parsing
 

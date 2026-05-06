@@ -4,7 +4,7 @@
 
 **Goal:** CLI-Prototyp der speech-swift (Qwen3-ASR) Transkription testet — Datei-Modus, Live Push-to-Talk, und Batch-Vergleich mit erwarteten Texten — inklusive Per-Stage-Latenz-Messung.
 
-**Architecture:** Eigenständiges CLI-Target `SpeechSwiftTestCLI` in `Tools/`, ohne Dependency auf `DerFluisterer`. Nutzt `Qwen3ASR` und `SpeechVAD` von speech-swift direkt. Audio-Loading via AVFoundation (bewährtes Pattern aus WhisperCppTestCLI), Mic-Capture via AVAudioEngine.
+**Architecture:** Eigenständiges CLI-Target `SpeechSwiftTestCLI` in `Tools/`, ohne Dependency auf `Kalizap`. Nutzt `Qwen3ASR` und `SpeechVAD` von speech-swift direkt. Audio-Loading via AVFoundation (bewährtes Pattern aus WhisperCppTestCLI), Mic-Capture via AVAudioEngine.
 
 **Tech Stack:** Swift 6.1, speech-swift (Qwen3Speech package), AVFoundation, ContinuousClock
 

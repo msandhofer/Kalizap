@@ -14,7 +14,7 @@
 
 - **Lokalisierungs-Mechanismus:** Simple Swift-Enum + Dictionary (kein Apple String Catalog / NSLocalizedString). Rationale: nur 5-6 Strings, bestehende App-Strings sind alle Deutsch, pragmatisch. Migration auf Apple-Infrastruktur ist moeglich, wenn mehr Strings dazukommen.
 - **Lokalisierungs-Scope:** Nur die neuen Banner-/Button-Strings fuer #46 werden lokalisiert. Bestehende deutsche Strings bleiben unveraendert (Settings, Toasts, Menu-Bar-Labels).
-- **Repo-URL:** `https://api.github.com/repos/msandhofer/Fluesterclon/releases/latest`.
+- **Repo-URL:** `https://api.github.com/repos/msandhofer/Kalizap/releases/latest`.
 - **Tag-Format:** `v0.2.0` (mit `v`-Prefix). Der Prefix wird beim Parsen ignoriert.
 - **Sprach-Detection:** `Locale.current.language.languageCode?.identifier == "en"` -> EN, sonst DE (Default).
 - **Spaeter-Semantik:** Per-Version-Dismiss. User klickt "Spaeter" -> `dismissedUpdateVersion = "0.2.0"` in `SystemSettings`. Banner verschwindet fuer diese Version. Bei 0.3.0 erscheint er wieder.
@@ -30,45 +30,45 @@
 
 | Pfad | Verantwortung |
 |---|---|
-| `Sources/DerFluisterer/Services/SemanticVersion.swift` | Struct mit `init?(_ string: String)` und `Comparable`. Parst `"v0.2.0"` / `"0.2.0"` / `"1.2.3-beta"` (ignoriert Suffix). |
-| `Sources/DerFluisterer/Services/HomebrewDetector.swift` | Protocol `HomebrewDetecting` + Production-Impl. Check via `FileManager.default.fileExists(atPath:)` auf vier Pfaden. Liefert `HomebrewStatus` (`.notInstalled`, `.installedDirectDownload`, `.installedViaCask`). |
-| `Sources/DerFluisterer/Services/GitHubReleasesClient.swift` | Protocol `GitHubReleasesFetching` + Production-Impl via `URLSession`. `func fetchLatestReleaseTag() async throws -> String?` (nil = 404 oder Netzwerkfehler, silent). |
-| `Sources/DerFluisterer/Services/UpdateBannerLocalization.swift` | Enum `UpdateBannerLocalization` mit `strings(for: Language)`. Struct `BannerStrings` mit Feldern fuer Titel, Buttons, Hinweise. |
-| `Sources/DerFluisterer/Modules/UpdateChecker.swift` | `UpdateChecker` Klasse. Orchestriert API-Call + Detection + Vergleich. Methoden: `checkIfDue()`, `checkNow()`. Produziert `UpdateState`. |
-| `Sources/DerFluisterer/Modules/UpdateState.swift` | Enum mit Cases `.unknown`, `.noUpdate`, `.available(version: String, method: UpdateMethod)`. `UpdateMethod` = `.homebrewCask(command: String)` oder `.directDownload(url: URL)`. |
-| `Sources/DerFluistererApp/Views/UpdateBannerView.swift` | SwiftUI-View, rendert `UpdateState`. Versteckt bei `.unknown`, `.noUpdate`, und wenn `dismissedUpdateVersion == available-Version`. |
-| `Tests/DerFluistererTests/SemanticVersionTests.swift` | Parsing + Vergleich. |
-| `Tests/DerFluistererTests/HomebrewDetectorTests.swift` | Mock-FileManager, alle 4 Pfad-Kombinationen. |
-| `Tests/DerFluistererTests/GitHubReleasesClientTests.swift` | Mock-HTTP, 200-OK + 404 + Fehler. |
-| `Tests/DerFluistererTests/UpdateBannerLocalizationTests.swift` | DE/EN-Strings vorhanden, keine leeren. |
-| `Tests/DerFluistererTests/UpdateCheckerTests.swift` | Orchestrator-Logik: 24h-Throttle, Dismissal, Versionen-Vergleich, Banner-State. |
+| `Sources/Kalizap/Services/SemanticVersion.swift` | Struct mit `init?(_ string: String)` und `Comparable`. Parst `"v0.2.0"` / `"0.2.0"` / `"1.2.3-beta"` (ignoriert Suffix). |
+| `Sources/Kalizap/Services/HomebrewDetector.swift` | Protocol `HomebrewDetecting` + Production-Impl. Check via `FileManager.default.fileExists(atPath:)` auf vier Pfaden. Liefert `HomebrewStatus` (`.notInstalled`, `.installedDirectDownload`, `.installedViaCask`). |
+| `Sources/Kalizap/Services/GitHubReleasesClient.swift` | Protocol `GitHubReleasesFetching` + Production-Impl via `URLSession`. `func fetchLatestReleaseTag() async throws -> String?` (nil = 404 oder Netzwerkfehler, silent). |
+| `Sources/Kalizap/Services/UpdateBannerLocalization.swift` | Enum `UpdateBannerLocalization` mit `strings(for: Language)`. Struct `BannerStrings` mit Feldern fuer Titel, Buttons, Hinweise. |
+| `Sources/Kalizap/Modules/UpdateChecker.swift` | `UpdateChecker` Klasse. Orchestriert API-Call + Detection + Vergleich. Methoden: `checkIfDue()`, `checkNow()`. Produziert `UpdateState`. |
+| `Sources/Kalizap/Modules/UpdateState.swift` | Enum mit Cases `.unknown`, `.noUpdate`, `.available(version: String, method: UpdateMethod)`. `UpdateMethod` = `.homebrewCask(command: String)` oder `.directDownload(url: URL)`. |
+| `Sources/KalizapApp/Views/UpdateBannerView.swift` | SwiftUI-View, rendert `UpdateState`. Versteckt bei `.unknown`, `.noUpdate`, und wenn `dismissedUpdateVersion == available-Version`. |
+| `Tests/KalizapTests/SemanticVersionTests.swift` | Parsing + Vergleich. |
+| `Tests/KalizapTests/HomebrewDetectorTests.swift` | Mock-FileManager, alle 4 Pfad-Kombinationen. |
+| `Tests/KalizapTests/GitHubReleasesClientTests.swift` | Mock-HTTP, 200-OK + 404 + Fehler. |
+| `Tests/KalizapTests/UpdateBannerLocalizationTests.swift` | DE/EN-Strings vorhanden, keine leeren. |
+| `Tests/KalizapTests/UpdateCheckerTests.swift` | Orchestrator-Logik: 24h-Throttle, Dismissal, Versionen-Vergleich, Banner-State. |
 
 ### Zu modifizierende Dateien
 
 | Pfad | Aenderung |
 |---|---|
-| `Sources/DerFluisterer/Modules/SettingsManager.swift` | `SystemSettings` bekommt `dismissedUpdateVersion: String?`. `CodingKeys` + `init(from:)` anpassen. |
-| `Sources/DerFluistererApp/AppState.swift` | `UpdateChecker`-Instanz + `checkIfDue()`-Aufruf in `bootstrap()`. `@Published var updateState: UpdateState`. |
-| `Sources/DerFluistererApp/Views/MenuBarView.swift` | `UpdateBannerView` einblenden oben im VStack. |
-| `Sources/DerFluistererApp/Views/SettingsView.swift` | In `SystemSettingsSection` einen Button "Nach Updates suchen" / "Check for updates" hinzufuegen. |
-| `Sources/DerFluistererApp/DerFluistererApp.swift` | `UpdateChecker`-Dependency wiren. |
-| `Sources/DerFluistererApp/Info.plist` | `SUFeedURL` + `SUPublicEDKey` entfernen (Sparkle-Altlasten). |
+| `Sources/Kalizap/Modules/SettingsManager.swift` | `SystemSettings` bekommt `dismissedUpdateVersion: String?`. `CodingKeys` + `init(from:)` anpassen. |
+| `Sources/KalizapApp/AppState.swift` | `UpdateChecker`-Instanz + `checkIfDue()`-Aufruf in `bootstrap()`. `@Published var updateState: UpdateState`. |
+| `Sources/KalizapApp/Views/MenuBarView.swift` | `UpdateBannerView` einblenden oben im VStack. |
+| `Sources/KalizapApp/Views/SettingsView.swift` | In `SystemSettingsSection` einen Button "Nach Updates suchen" / "Check for updates" hinzufuegen. |
+| `Sources/KalizapApp/KalizapApp.swift` | `UpdateChecker`-Dependency wiren. |
+| `Sources/KalizapApp/Info.plist` | `SUFeedURL` + `SUPublicEDKey` entfernen (Sparkle-Altlasten). |
 
 ---
 
 ## Task 1: `SemanticVersion` — Parsing + Vergleich (TDD)
 
 **Files:**
-- Create: `Sources/DerFluisterer/Services/SemanticVersion.swift`
-- Test: `Tests/DerFluistererTests/SemanticVersionTests.swift`
+- Create: `Sources/Kalizap/Services/SemanticVersion.swift`
+- Test: `Tests/KalizapTests/SemanticVersionTests.swift`
 
 - [ ] **Step 1: Test schreiben — Parsing verschiedener Formate**
 
-Datei: `Tests/DerFluistererTests/SemanticVersionTests.swift`:
+Datei: `Tests/KalizapTests/SemanticVersionTests.swift`:
 
 ```swift
 import XCTest
-@testable import DerFluisterer
+@testable import Kalizap
 
 final class SemanticVersionTests: XCTestCase {
 
@@ -108,7 +108,7 @@ Expected: Compile-Fehler `cannot find 'SemanticVersion' in scope`.
 
 - [ ] **Step 3: Implementation schreiben**
 
-Datei: `Sources/DerFluisterer/Services/SemanticVersion.swift`:
+Datei: `Sources/Kalizap/Services/SemanticVersion.swift`:
 
 ```swift
 import Foundation
@@ -191,16 +191,16 @@ Noch kein Commit — Task 2-4 bauen aufeinander auf, commit am Ende als feat-Blo
 ## Task 2: `HomebrewDetector` — Installationspfad-Detection (TDD)
 
 **Files:**
-- Create: `Sources/DerFluisterer/Services/HomebrewDetector.swift`
-- Test: `Tests/DerFluistererTests/HomebrewDetectorTests.swift`
+- Create: `Sources/Kalizap/Services/HomebrewDetector.swift`
+- Test: `Tests/KalizapTests/HomebrewDetectorTests.swift`
 
 - [ ] **Step 1: Test schreiben**
 
-Datei: `Tests/DerFluistererTests/HomebrewDetectorTests.swift`:
+Datei: `Tests/KalizapTests/HomebrewDetectorTests.swift`:
 
 ```swift
 import XCTest
-@testable import DerFluisterer
+@testable import Kalizap
 
 final class HomebrewDetectorTests: XCTestCase {
 
@@ -233,14 +233,14 @@ final class HomebrewDetectorTests: XCTestCase {
 
     func test_detect_brewArmAndCaskroom_returnsInstalledViaCask() {
         let fake = FakeFileExistenceChecker()
-        fake.existingPaths = ["/opt/homebrew/bin/brew", "/opt/homebrew/Caskroom/derfluesterer"]
+        fake.existingPaths = ["/opt/homebrew/bin/brew", "/opt/homebrew/Caskroom/kalizap"]
         let sut = HomebrewDetector(fileExistence: fake)
         XCTAssertEqual(sut.detect(), .installedViaCask)
     }
 
     func test_detect_brewIntelAndCaskroom_returnsInstalledViaCask() {
         let fake = FakeFileExistenceChecker()
-        fake.existingPaths = ["/usr/local/bin/brew", "/usr/local/Caskroom/derfluesterer"]
+        fake.existingPaths = ["/usr/local/bin/brew", "/usr/local/Caskroom/kalizap"]
         let sut = HomebrewDetector(fileExistence: fake)
         XCTAssertEqual(sut.detect(), .installedViaCask)
     }
@@ -254,7 +254,7 @@ Expected: Compile-Fehler fuer `HomebrewDetector`, `FileExistenceChecking`, `Home
 
 - [ ] **Step 3: Implementation schreiben**
 
-Datei: `Sources/DerFluisterer/Services/HomebrewDetector.swift`:
+Datei: `Sources/Kalizap/Services/HomebrewDetector.swift`:
 
 ```swift
 import Foundation
@@ -285,8 +285,8 @@ public struct HomebrewDetector: Sendable {
     ]
 
     private static let caskroomPaths = [
-        "/opt/homebrew/Caskroom/derfluesterer",
-        "/usr/local/Caskroom/derfluesterer",
+        "/opt/homebrew/Caskroom/kalizap",
+        "/usr/local/Caskroom/kalizap",
     ]
 
     public init(fileExistence: any FileExistenceChecking = ProductionFileExistenceChecker()) {
@@ -313,16 +313,16 @@ Expected: PASS (5 Tests).
 ## Task 3: `GitHubReleasesClient` — HTTP-Client mit Mock-Support (TDD)
 
 **Files:**
-- Create: `Sources/DerFluisterer/Services/GitHubReleasesClient.swift`
-- Test: `Tests/DerFluistererTests/GitHubReleasesClientTests.swift`
+- Create: `Sources/Kalizap/Services/GitHubReleasesClient.swift`
+- Test: `Tests/KalizapTests/GitHubReleasesClientTests.swift`
 
 - [ ] **Step 1: Test schreiben**
 
-Datei: `Tests/DerFluistererTests/GitHubReleasesClientTests.swift`:
+Datei: `Tests/KalizapTests/GitHubReleasesClientTests.swift`:
 
 ```swift
 import XCTest
-@testable import DerFluisterer
+@testable import Kalizap
 
 final class GitHubReleasesClientTests: XCTestCase {
 
@@ -340,7 +340,7 @@ final class GitHubReleasesClientTests: XCTestCase {
     func test_fetchLatestReleaseTag_success_returnsTagName() async throws {
         let fake = FakeHTTPSender()
         fake.dataToReturn = try JSONSerialization.data(withJSONObject: ["tag_name": "v0.2.0"])
-        let sut = GitHubReleasesClient(owner: "msandhofer", repo: "Fluesterclon", session: fake)
+        let sut = GitHubReleasesClient(owner: "msandhofer", repo: "Kalizap", session: fake)
 
         let tag = try await sut.fetchLatestReleaseTag()
 
@@ -350,7 +350,7 @@ final class GitHubReleasesClientTests: XCTestCase {
     func test_fetchLatestReleaseTag_notFound404_returnsNil() async throws {
         let fake = FakeHTTPSender()
         fake.responseToReturn = HTTPURLResponse(url: URL(string: "https://example.com")!, statusCode: 404, httpVersion: nil, headerFields: nil)!
-        let sut = GitHubReleasesClient(owner: "msandhofer", repo: "Fluesterclon", session: fake)
+        let sut = GitHubReleasesClient(owner: "msandhofer", repo: "Kalizap", session: fake)
 
         let tag = try await sut.fetchLatestReleaseTag()
 
@@ -360,7 +360,7 @@ final class GitHubReleasesClientTests: XCTestCase {
     func test_fetchLatestReleaseTag_networkError_returnsNil() async throws {
         let fake = FakeHTTPSender()
         fake.errorToThrow = URLError(.notConnectedToInternet)
-        let sut = GitHubReleasesClient(owner: "msandhofer", repo: "Fluesterclon", session: fake)
+        let sut = GitHubReleasesClient(owner: "msandhofer", repo: "Kalizap", session: fake)
 
         let tag = try await sut.fetchLatestReleaseTag()
 
@@ -370,7 +370,7 @@ final class GitHubReleasesClientTests: XCTestCase {
     func test_fetchLatestReleaseTag_malformedJson_returnsNil() async throws {
         let fake = FakeHTTPSender()
         fake.dataToReturn = Data("not valid json".utf8)
-        let sut = GitHubReleasesClient(owner: "msandhofer", repo: "Fluesterclon", session: fake)
+        let sut = GitHubReleasesClient(owner: "msandhofer", repo: "Kalizap", session: fake)
 
         let tag = try await sut.fetchLatestReleaseTag()
 
@@ -380,7 +380,7 @@ final class GitHubReleasesClientTests: XCTestCase {
     func test_fetchLatestReleaseTag_missingTagNameField_returnsNil() async throws {
         let fake = FakeHTTPSender()
         fake.dataToReturn = try JSONSerialization.data(withJSONObject: ["other_field": "value"])
-        let sut = GitHubReleasesClient(owner: "msandhofer", repo: "Fluesterclon", session: fake)
+        let sut = GitHubReleasesClient(owner: "msandhofer", repo: "Kalizap", session: fake)
 
         let tag = try await sut.fetchLatestReleaseTag()
 
@@ -396,7 +396,7 @@ Expected: Compile-Fehler fuer `GitHubReleasesClient`.
 
 - [ ] **Step 3: Implementation schreiben**
 
-Datei: `Sources/DerFluisterer/Services/GitHubReleasesClient.swift`:
+Datei: `Sources/Kalizap/Services/GitHubReleasesClient.swift`:
 
 ```swift
 import Foundation
@@ -451,16 +451,16 @@ Expected: PASS (5 Tests).
 ## Task 4: `UpdateBannerLocalization` — DE/EN-Strings (TDD)
 
 **Files:**
-- Create: `Sources/DerFluisterer/Services/UpdateBannerLocalization.swift`
-- Test: `Tests/DerFluistererTests/UpdateBannerLocalizationTests.swift`
+- Create: `Sources/Kalizap/Services/UpdateBannerLocalization.swift`
+- Test: `Tests/KalizapTests/UpdateBannerLocalizationTests.swift`
 
 - [ ] **Step 1: Test schreiben**
 
-Datei: `Tests/DerFluistererTests/UpdateBannerLocalizationTests.swift`:
+Datei: `Tests/KalizapTests/UpdateBannerLocalizationTests.swift`:
 
 ```swift
 import XCTest
-@testable import DerFluisterer
+@testable import Kalizap
 
 final class UpdateBannerLocalizationTests: XCTestCase {
 
@@ -518,7 +518,7 @@ Expected: Compile-Fehler.
 
 - [ ] **Step 3: Implementation schreiben**
 
-Datei: `Sources/DerFluisterer/Services/UpdateBannerLocalization.swift`:
+Datei: `Sources/Kalizap/Services/UpdateBannerLocalization.swift`:
 
 ```swift
 import Foundation
@@ -585,13 +585,13 @@ Expected: PASS (6 Tests).
 ## Task 5: `UpdateState` + `UpdateChecker`-Orchestrator (TDD)
 
 **Files:**
-- Create: `Sources/DerFluisterer/Modules/UpdateState.swift`
-- Create: `Sources/DerFluisterer/Modules/UpdateChecker.swift`
-- Test: `Tests/DerFluistererTests/UpdateCheckerTests.swift`
+- Create: `Sources/Kalizap/Modules/UpdateState.swift`
+- Create: `Sources/Kalizap/Modules/UpdateChecker.swift`
+- Test: `Tests/KalizapTests/UpdateCheckerTests.swift`
 
 - [ ] **Step 1: `UpdateState.swift` schreiben**
 
-Datei: `Sources/DerFluisterer/Modules/UpdateState.swift`:
+Datei: `Sources/Kalizap/Modules/UpdateState.swift`:
 
 ```swift
 import Foundation
@@ -610,11 +610,11 @@ public enum UpdateState: Equatable, Sendable {
 
 - [ ] **Step 2: Test fuer `UpdateChecker` schreiben**
 
-Datei: `Tests/DerFluistererTests/UpdateCheckerTests.swift`:
+Datei: `Tests/KalizapTests/UpdateCheckerTests.swift`:
 
 ```swift
 import XCTest
-@testable import DerFluisterer
+@testable import Kalizap
 
 final class UpdateCheckerTests: XCTestCase {
 
@@ -647,8 +647,8 @@ final class UpdateCheckerTests: XCTestCase {
             currentVersion: currentVersion,
             releasesClient: releases,
             homebrewDetector: brew,
-            githubReleaseBaseURL: URL(string: "https://github.com/msandhofer/Fluesterclon/releases/latest")!,
-            homebrewCaskCommand: "brew upgrade --cask msandhofer/derfluesterer/derfluesterer"
+            githubReleaseBaseURL: URL(string: "https://github.com/msandhofer/Kalizap/releases/latest")!,
+            homebrewCaskCommand: "brew upgrade --cask msandhofer/kalizap/kalizap"
         )
         return (checker, releases, brew)
     }
@@ -667,7 +667,7 @@ final class UpdateCheckerTests: XCTestCase {
         if case .available(let v, let method) = state {
             XCTAssertEqual(v, "0.2.0")
             if case .directDownload(let url) = method {
-                XCTAssertEqual(url.absoluteString, "https://github.com/msandhofer/Fluesterclon/releases/latest")
+                XCTAssertEqual(url.absoluteString, "https://github.com/msandhofer/Kalizap/releases/latest")
             } else {
                 XCTFail("Expected directDownload method")
             }
@@ -717,7 +717,7 @@ Expected: Compile-Fehler fuer `UpdateChecker`, `ReleasesFetching`, `HomebrewDete
 
 - [ ] **Step 4: Protokolle + Checker schreiben**
 
-Datei: `Sources/DerFluisterer/Modules/UpdateChecker.swift`:
+Datei: `Sources/Kalizap/Modules/UpdateChecker.swift`:
 
 ```swift
 import Foundation
@@ -791,8 +791,8 @@ Expected: PASS (6 Tests).
 ## Task 6: 24h-Throttle in `UpdateChecker` (TDD)
 
 **Files:**
-- Modify: `Sources/DerFluisterer/Modules/UpdateChecker.swift`
-- Modify: `Tests/DerFluistererTests/UpdateCheckerTests.swift`
+- Modify: `Sources/Kalizap/Modules/UpdateChecker.swift`
+- Modify: `Tests/KalizapTests/UpdateCheckerTests.swift`
 
 - [ ] **Step 1: Test schreiben**
 
@@ -887,17 +887,17 @@ Expected: PASS (9 Tests).
 - [ ] **Step 4: Zwischen-Commit**
 
 ```bash
-git add Sources/DerFluisterer/Services/SemanticVersion.swift
-git add Sources/DerFluisterer/Services/HomebrewDetector.swift
-git add Sources/DerFluisterer/Services/GitHubReleasesClient.swift
-git add Sources/DerFluisterer/Services/UpdateBannerLocalization.swift
-git add Sources/DerFluisterer/Modules/UpdateState.swift
-git add Sources/DerFluisterer/Modules/UpdateChecker.swift
-git add Tests/DerFluistererTests/SemanticVersionTests.swift
-git add Tests/DerFluistererTests/HomebrewDetectorTests.swift
-git add Tests/DerFluistererTests/GitHubReleasesClientTests.swift
-git add Tests/DerFluistererTests/UpdateBannerLocalizationTests.swift
-git add Tests/DerFluistererTests/UpdateCheckerTests.swift
+git add Sources/Kalizap/Services/SemanticVersion.swift
+git add Sources/Kalizap/Services/HomebrewDetector.swift
+git add Sources/Kalizap/Services/GitHubReleasesClient.swift
+git add Sources/Kalizap/Services/UpdateBannerLocalization.swift
+git add Sources/Kalizap/Modules/UpdateState.swift
+git add Sources/Kalizap/Modules/UpdateChecker.swift
+git add Tests/KalizapTests/SemanticVersionTests.swift
+git add Tests/KalizapTests/HomebrewDetectorTests.swift
+git add Tests/KalizapTests/GitHubReleasesClientTests.swift
+git add Tests/KalizapTests/UpdateBannerLocalizationTests.swift
+git add Tests/KalizapTests/UpdateCheckerTests.swift
 git commit -m "$(cat <<'EOF'
 feat(#46): UpdateChecker mit GitHub-Releases, Homebrew-Detection, SemVer
 
@@ -921,8 +921,8 @@ EOF
 ## Task 7: Persistenter Version-Dismiss in `SystemSettings`
 
 **Files:**
-- Modify: `Sources/DerFluisterer/Modules/SettingsManager.swift`
-- Modify: `Tests/DerFluistererTests/SettingsManagerTests.swift`
+- Modify: `Sources/Kalizap/Modules/SettingsManager.swift`
+- Modify: `Tests/KalizapTests/SettingsManagerTests.swift`
 
 - [ ] **Step 1: Test schreiben**
 
@@ -944,7 +944,7 @@ In `SettingsManagerTests.swift`, naechste passende Test-Klasse (`SettingsManager
 
 - [ ] **Step 2: `SystemSettings` erweitern**
 
-In `Sources/DerFluisterer/Modules/SettingsManager.swift`:
+In `Sources/Kalizap/Modules/SettingsManager.swift`:
 
 **Alt:**
 ```swift
@@ -995,16 +995,16 @@ Expected: Alle Tests inklusive der neuen passieren.
 ## Task 8: `UpdateBannerView` — SwiftUI (TDD-light, UI)
 
 **Files:**
-- Create: `Sources/DerFluistererApp/Views/UpdateBannerView.swift`
+- Create: `Sources/KalizapApp/Views/UpdateBannerView.swift`
 
 - [ ] **Step 1: View schreiben**
 
-Datei: `Sources/DerFluistererApp/Views/UpdateBannerView.swift`:
+Datei: `Sources/KalizapApp/Views/UpdateBannerView.swift`:
 
 ```swift
 import AppKit
 import SwiftUI
-import DerFluisterer
+import Kalizap
 
 struct UpdateBannerView: View {
     let state: UpdateState
@@ -1086,7 +1086,7 @@ Expected: grün.
 ## Task 9: Bootstrap in `AppState`
 
 **Files:**
-- Modify: `Sources/DerFluistererApp/AppState.swift`
+- Modify: `Sources/KalizapApp/AppState.swift`
 
 - [ ] **Step 1: `AppState` erweitern um UpdateChecker + State**
 
@@ -1108,14 +1108,14 @@ Am Ende der AppState-Klasse eine neue Methode hinzufuegen:
 ```swift
     private func triggerUpdateCheckIfNeeded() async {
         let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
-        let releases = GitHubReleasesClient(owner: "msandhofer", repo: "Fluesterclon")
+        let releases = GitHubReleasesClient(owner: "msandhofer", repo: "Kalizap")
         let brew = HomebrewDetector()
         let checker = UpdateChecker(
             currentVersion: currentVersion,
             releasesClient: releases,
             homebrewDetector: brew,
-            githubReleaseBaseURL: URL(string: "https://github.com/msandhofer/Fluesterclon/releases/latest")!,
-            homebrewCaskCommand: "brew upgrade --cask msandhofer/derfluesterer/derfluesterer"
+            githubReleaseBaseURL: URL(string: "https://github.com/msandhofer/Kalizap/releases/latest")!,
+            homebrewCaskCommand: "brew upgrade --cask msandhofer/kalizap/kalizap"
         )
         self.updateChecker = checker
         _ = await checker.checkIfDue(defaults: .standard)
@@ -1148,7 +1148,7 @@ Expected: Bestehende Tests bleiben grün.
 ## Task 10: `MenuBarView` — Banner einbinden
 
 **Files:**
-- Modify: `Sources/DerFluistererApp/Views/MenuBarView.swift`
+- Modify: `Sources/KalizapApp/Views/MenuBarView.swift`
 
 - [ ] **Step 1: Banner im VStack einfügen**
 
@@ -1167,7 +1167,7 @@ In `MenuBarView.swift` das `body` anpassen. Direkt nach `Text("DerFlüsterer")`:
 
 Wichtig: `MenuBarView` braucht noch Zugriff auf `appState`. Falls noch nicht drin: Parameter hinzufuegen.
 
-Die Signatur pruefen — wahrscheinlich hat `MenuBarView` schon `appState` aus dem Call-Site. Falls nicht: das `@main` in `DerFluistererApp.swift` anpassen.
+Die Signatur pruefen — wahrscheinlich hat `MenuBarView` schon `appState` aus dem Call-Site. Falls nicht: das `@main` in `KalizapApp.swift` anpassen.
 
 Fallback-Annahme: `MenuBarView` bekommt aktuell `settings`, `pipeline`, `historyVM`. Wir ergaenzen `appState`:
 
@@ -1180,7 +1180,7 @@ struct MenuBarView: View {
     @Environment(\.openWindow) private var openWindow
 ```
 
-Und in `DerFluistererApp.swift`, wo `MenuBarView` instanziiert wird, `appState: appState` uebergeben.
+Und in `KalizapApp.swift`, wo `MenuBarView` instanziiert wird, `appState: appState` uebergeben.
 
 - [ ] **Step 2: Build verifizieren**
 
@@ -1192,7 +1192,7 @@ Expected: grün.
 ## Task 11: Settings-Button "Nach Updates suchen"
 
 **Files:**
-- Modify: `Sources/DerFluistererApp/Views/SettingsView.swift`
+- Modify: `Sources/KalizapApp/Views/SettingsView.swift`
 
 - [ ] **Step 1: Button in `SystemSettingsSection` einfuegen**
 
@@ -1221,14 +1221,14 @@ Expected: alle gruen.
 ## Task 12: Info.plist Sparkle-Altlasten aufräumen
 
 **Files:**
-- Modify: `Sources/DerFluistererApp/Info.plist`
+- Modify: `Sources/KalizapApp/Info.plist`
 
 - [ ] **Step 1: `SUFeedURL` + `SUPublicEDKey`-Eintraege entfernen**
 
 **Alt:**
 ```xml
     <key>SUFeedURL</key>
-    <string>https://github.com/msandhofer/Fluesterclon/releases/latest/download/appcast.xml</string>
+    <string>https://github.com/msandhofer/Kalizap/releases/latest/download/appcast.xml</string>
     <key>SUPublicEDKey</key>
     <string></string>
 ```
@@ -1260,7 +1260,7 @@ Expected: `Build complete!`, keine Warnings bei meinen Files.
 
 - [ ] **Step 3: Manuelle App-Verifikation**
 
-Run: `swift run DerFluistererApp`
+Run: `swift run KalizapApp`
 
 Manuell pruefen:
 - App startet ohne Crash
@@ -1315,7 +1315,7 @@ gh issue close 46 --comment "Implementierung abgeschlossen, siehe vorheriger Kom
 
 - [ ] **Step 3: Memory aktualisieren**
 
-`project_fluesterclon.md`:
+`project_kalizap.md`:
 - #46 aus offenen Issues nach "Kuerzlich geschlossen"
 - "Offene Issues (4)": #1, #47, #48, #51
 
