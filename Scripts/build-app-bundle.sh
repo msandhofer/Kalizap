@@ -57,17 +57,28 @@ plutil -replace CFBundleExecutable -string "Kalizap" "$APP_DIR/Contents/Info.pli
 cp -R "$RESOURCE_BUNDLE" "$APP_DIR/Contents/Resources/"
 
 echo ""
-echo "Step 3/5: Adhoc-Codesignatur"
-# --deep ist deprecated in macOS 11+, fuer eine flache .app-Struktur ohne
-# eingebettete Frameworks aber unkritisch. Adhoc-Sign (Identity "-") reicht
-# fuer Homebrew-Cask-Distribution; Quarantaene wird beim brew-Install
-# automatisch entfernt.
-codesign --force --sign - --deep "$APP_DIR"
+echo "Step 3/5: Codesignatur mit Self-Signed Cert"
+# Self-signed Identity statt Adhoc, damit TCC-Permissions (Mikrofon,
+# Bedienungshilfen) ueber `brew upgrade --cask kalizap` persistieren.
+# Der Cert-Hash ist Teil der Designated Requirement, die in der TCC-DB
+# pro App gespeichert wird — solange wir mit demselben Cert signieren,
+# erkennt macOS auf User-Maschinen Updates als "dieselbe App".
+# Bei Verlust des Certs siehe Backup-Hinweis in docs/release-process.md.
+SIGN_IDENTITY="${KALIZAP_SIGN_IDENTITY:-Kalizap Code Signing}"
+
+if ! security find-identity -v -p codesigning | grep -q "$SIGN_IDENTITY"; then
+    echo "ERROR: Code-Signing-Identity '$SIGN_IDENTITY' nicht in Keychain gefunden."
+    echo "Pruefen mit: security find-identity -v -p codesigning"
+    echo "Setup-Anleitung: docs/release-process.md (Abschnitt Self-Signed Cert)"
+    exit 1
+fi
+
+codesign --force --sign "$SIGN_IDENTITY" --deep "$APP_DIR"
 
 echo ""
 echo "Step 4/5: Verifikation"
 codesign --verify --strict "$APP_DIR"
-echo "  Adhoc-Signatur ok"
+echo "  Signatur mit '$SIGN_IDENTITY' ok"
 
 echo ""
 echo "Step 5/5: ZIP packen"

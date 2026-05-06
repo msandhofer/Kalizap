@@ -20,6 +20,46 @@ Tap-Repository einmalig anlegen:
 gh repo create msandhofer/homebrew-kalizap --public --description "Homebrew Tap für Kalizap"
 ```
 
+### Self-Signed Code-Signing-Cert (kritisch für TCC-Stabilität)
+
+**Warum:** Ohne stabiles Cert würden Endnutzer bei jedem `brew upgrade --cask kalizap` ihre Mikrofon- und Bedienungshilfen-Permissions verlieren. macOS TCC bindet Permissions an die Code-Signing-Identity. Bei Adhoc-Sign (`--sign -`) ändert sich diese Identity bei jedem Re-Build (Bindung an cdhash); mit Self-Signed Cert bleibt sie konstant.
+
+**Setup** (~10 min, einmalig):
+
+1. Keychain Access öffnen → Menü `Certificate Assistant` → `Create a Certificate...`
+2. Dialog:
+   - Name: `Kalizap Code Signing`
+   - Identity Type: `Self Signed Root`
+   - Certificate Type: `Code Signing`
+   - `Let me override defaults` ankreuzen
+3. Validity Period: `3650` Tage (10 Jahre, damit Releases nicht plötzlich nicht mehr signierbar sind)
+4. Restliche Dialoge mit Default → `Continue` → `Create`
+5. **Trust setzen**: Cert in Keychain Access doppelklicken → Bereich `Trust` aufklappen → `Code Signing:` auf `Always Trust`
+6. Verifikation:
+   ```bash
+   security find-identity -v -p codesigning
+   ```
+   Erwartete Ausgabe enthält `"Kalizap Code Signing"`.
+
+**Backup (Pflicht, vor erstem Release!):**
+
+Verlust des Certs = bei nächstem Release neue Identity = alle bestehenden User-Permissions weg.
+
+1. In Keychain Access auf das Cert rechtsklicken → `Export "Kalizap Code Signing"...`
+2. Format: `Personal Information Exchange (.p12)`
+3. Speichern in sicherem Backup (Cloud-verschlüsselt, USB-Stick im Safe, Passwort-Manager — NICHT im Repo)
+4. Export-Passwort merken/im Passwort-Safe speichern
+
+**Wichtig:** Trust-Settings sind keine Eigenschaft des Certs, sondern eine separate macOS-DB. Beim Restore aus `.p12` auf einer neuen Maschine müssen die Trust-Settings (Schritt 5) erneut gesetzt werden.
+
+**Cert-Name überschreiben (optional):**
+
+Das Build-Skript verwendet standardmäßig `Kalizap Code Signing`. Falls das Cert bei dir anders heißt:
+
+```bash
+KALIZAP_SIGN_IDENTITY="Eigener Cert-Name" ./Scripts/build-app-bundle.sh
+```
+
 ## Release durchführen
 
 ### 1. Version bumpen
