@@ -11,6 +11,7 @@ final class AppState {
 
     private let store: any DictationStoring
     private var bootstrapped = false
+    private let modelResolver = ClaudeModelResolver()
     private var apiKeyToastShown = false
 
     private(set) var updateState: UpdateState = .unknown
@@ -28,6 +29,7 @@ final class AppState {
         bootstrapped = true
 
         await settings.validateAPIKey()
+        refreshModelIDs()
         await startPipeline()
         await triggerUpdateCheckIfNeeded()
 
@@ -98,9 +100,19 @@ final class AppState {
 
     // MARK: - Private
 
+    /// Resolves "newest Haiku/Sonnet" to concrete model IDs in the background (#57).
+    /// Until it completes, the cached or built-in IDs are used.
+    private func refreshModelIDs() {
+        guard let apiKey = try? settings.resolveAPIKey() else { return }
+        let resolver = modelResolver
+        Task.detached(priority: .utility) {
+            await resolver.refresh(apiKey: apiKey)
+        }
+    }
+
     private func startPipeline() async {
         FileLog.log("startPipeline — language=\(settings.audio.language.rawValue)")
-        let p = await PipelineFactory.makePipeline(settings: settings, store: store)
+        let p = await PipelineFactory.makePipeline(settings: settings, store: store, modelResolver: modelResolver)
 
         p.onCorrectionFallback = { [weak self] in
             Task { @MainActor in

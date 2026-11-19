@@ -157,6 +157,15 @@ struct CorrectionSettingsSection: View {
     private var isLLMEnabled: Bool { settings.correction.isLLMEnabled }
 
     var body: some View {
+        Section("Korrektur-Modell") {
+            Picker("Modell", selection: $settings.correction.modelFamily) {
+                ForEach(ClaudeModelFamily.allCases, id: \.self) { family in
+                    Text(family.displayName).tag(family)
+                }
+            }
+            .disabled(!isLLMEnabled)
+        }
+
         Section("Kontext-Modus") {
             Picker("Modus", selection: $settings.correction.contextMode) {
                 Text("Formell").tag(ContextMode.formal)

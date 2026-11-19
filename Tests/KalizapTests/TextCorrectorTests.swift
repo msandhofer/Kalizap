@@ -7,7 +7,7 @@ final class TextCorrectorTests: XCTestCase {
 
     private func makeSUT(
         config: CorrectionConfig = CorrectionConfig(),
-        transport: @escaping @Sendable (String, String, Int) async throws -> String = { _, _, _ in "corrected" },
+        transport: @escaping @Sendable (String, String, Int, ClaudeModelFamily) async throws -> String = { _, _, _, _ in "corrected" },
         apiKeyProvider: @escaping @Sendable () throws -> String = { "test-key" }
     ) -> TextCorrectorImpl {
         TextCorrectorImpl(
@@ -20,7 +20,7 @@ final class TextCorrectorTests: XCTestCase {
     // MARK: - Cycle 1: Happy path
 
     func test_correct_happyPath_returnsCorrectedText() async {
-        let sut = makeSUT(transport: { _, _, _ in
+        let sut = makeSUT(transport: { _, _, _, _ in
             return "Korrigierter Text"
         })
 
@@ -35,12 +35,34 @@ final class TextCorrectorTests: XCTestCase {
         }
     }
 
+    func test_correct_passesConfiguredModelFamilyToTransport() async {
+        let captured = SendableBox<ClaudeModelFamily?>(nil)
+        let sut = makeSUT(config: CorrectionConfig(modelFamily: .sonnet), transport: { _, _, _, family in
+            captured.set(family)
+            return "ok"
+        })
+
+        _ = await sut.correct(makeTestTranscriptionResult("x"))
+
+        XCTAssertEqual(captured.value, .sonnet)
+    }
+
+    func test_correctionSettings_defaultToHaikuAndFlowIntoConfig() throws {
+        XCTAssertEqual(CorrectionSettings().modelFamily, .haiku)
+        let legacy = try JSONDecoder().decode(CorrectionSettings.self, from: Data("{}".utf8))
+        XCTAssertEqual(legacy.modelFamily, .haiku)
+
+        var settings = CorrectionSettings()
+        settings.modelFamily = .sonnet
+        XCTAssertEqual(settings.buildCorrectionConfig(frontmostApp: nil).modelFamily, .sonnet)
+    }
+
     // MARK: - Cycle 2: ContextMode in prompt
 
     func test_correct_formalMode_promptContainsFormal() async {
         let captured = SendableBox<String?>(nil)
         let config = CorrectionConfig(contextMode: .formal)
-        let sut = makeSUT(config: config, transport: { systemPrompt, _, _ in
+        let sut = makeSUT(config: config, transport: { systemPrompt, _, _, _ in
             captured.set(systemPrompt)
             return "text"
         })
@@ -53,7 +75,7 @@ final class TextCorrectorTests: XCTestCase {
     func test_correct_informalMode_promptContainsInformal() async {
         let captured = SendableBox<String?>(nil)
         let config = CorrectionConfig(contextMode: .informal)
-        let sut = makeSUT(config: config, transport: { systemPrompt, _, _ in
+        let sut = makeSUT(config: config, transport: { systemPrompt, _, _, _ in
             captured.set(systemPrompt)
             return "text"
         })
@@ -68,7 +90,7 @@ final class TextCorrectorTests: XCTestCase {
     func test_correct_withRephrasing_promptContainsRephrasingPermission() async {
         let captured = SendableBox<String?>(nil)
         let config = CorrectionConfig(intensity: CorrectionIntensity(allowRephrasing: true))
-        let sut = makeSUT(config: config, transport: { systemPrompt, _, _ in
+        let sut = makeSUT(config: config, transport: { systemPrompt, _, _, _ in
             captured.set(systemPrompt)
             return "text"
         })
@@ -81,7 +103,7 @@ final class TextCorrectorTests: XCTestCase {
     func test_correct_withoutRephrasing_promptOmitsRephrasingPermission() async {
         let captured = SendableBox<String?>(nil)
         let config = CorrectionConfig(intensity: CorrectionIntensity(allowRephrasing: false))
-        let sut = makeSUT(config: config, transport: { systemPrompt, _, _ in
+        let sut = makeSUT(config: config, transport: { systemPrompt, _, _, _ in
             captured.set(systemPrompt)
             return "text"
         })
@@ -96,7 +118,7 @@ final class TextCorrectorTests: XCTestCase {
     func test_correct_withDictionary_promptContainsTerms() async {
         let captured = SendableBox<String?>(nil)
         let config = CorrectionConfig(personalDictionary: ["SwiftUI", "WhisperKit"])
-        let sut = makeSUT(config: config, transport: { systemPrompt, _, _ in
+        let sut = makeSUT(config: config, transport: { systemPrompt, _, _, _ in
             captured.set(systemPrompt)
             return "text"
         })
@@ -111,7 +133,7 @@ final class TextCorrectorTests: XCTestCase {
 
     func test_correct_firstCallFails_retriesAndSucceeds() async {
         let callCount = SendableBox(0)
-        let sut = makeSUT(transport: { _, _, _ in
+        let sut = makeSUT(transport: { _, _, _, _ in
             callCount.set(callCount.value + 1)
             if callCount.value == 1 {
                 throw NSError(domain: "test", code: 1)
@@ -133,7 +155,7 @@ final class TextCorrectorTests: XCTestCase {
     // MARK: - Cycle 6: Fallback after retry exhaustion
 
     func test_correct_allRetriesFail_returnsFallbackRaw() async {
-        let sut = makeSUT(transport: { _, _, _ in
+        let sut = makeSUT(transport: { _, _, _, _ in
             throw NSError(domain: "test", code: 1)
         })
 
@@ -153,7 +175,7 @@ final class TextCorrectorTests: XCTestCase {
 
     func test_correct_timeout_returnsFallbackWithTimeoutReason() async {
         let config = CorrectionConfig(timeoutMs: 50, maxRetries: 0)
-        let sut = makeSUT(config: config, transport: { _, _, _ in
+        let sut = makeSUT(config: config, transport: { _, _, _, _ in
             try await Task.sleep(for: .milliseconds(200))
             return "too late"
         })
@@ -172,7 +194,7 @@ final class TextCorrectorTests: XCTestCase {
     // MARK: - Cycle 8: Empty response
 
     func test_correct_emptyResponse_returnsFallbackRaw() async {
-        let sut = makeSUT(transport: { _, _, _ in "" })
+        let sut = makeSUT(transport: { _, _, _, _ in "" })
 
         let outcome = await sut.correct(makeTestTranscriptionResult("test input"))
 
@@ -189,7 +211,7 @@ final class TextCorrectorTests: XCTestCase {
     // MARK: - Cycle 9: DebugSnapshot
 
     func test_correct_setsLastDebugSnapshot() async {
-        let sut = makeSUT(transport: { _, _, _ in "corrected" })
+        let sut = makeSUT(transport: { _, _, _, _ in "corrected" })
 
         _ = await sut.correct(makeTestTranscriptionResult("input"))
 
@@ -203,7 +225,7 @@ final class TextCorrectorTests: XCTestCase {
 
     func test_updateConfig_affectsNextCall() async {
         let captured = SendableBox<String?>(nil)
-        let sut = makeSUT(config: CorrectionConfig(contextMode: .neutral), transport: { systemPrompt, _, _ in
+        let sut = makeSUT(config: CorrectionConfig(contextMode: .neutral), transport: { systemPrompt, _, _, _ in
             captured.set(systemPrompt)
             return "text"
         })
@@ -218,7 +240,7 @@ final class TextCorrectorTests: XCTestCase {
 
     func test_correct_wrapsUserTextInDiktatTags() async {
         let capturedUserText = SendableBox<String?>(nil)
-        let sut = makeSUT(transport: { _, userText, _ in
+        let sut = makeSUT(transport: { _, userText, _, _ in
             capturedUserText.set(userText)
             return "corrected"
         })

@@ -7,7 +7,8 @@ enum PipelineFactory {
 
     static func makePipeline(
         settings: SettingsManager,
-        store: any DictationStoring
+        store: any DictationStoring,
+        modelResolver: ClaudeModelResolver
     ) async -> DictationPipeline {
         // Framework lazy-init: instantiating NSSound here loads AudioToolbox
         // and the NSSound machinery into the process. The HW isn't woken, but
@@ -21,7 +22,7 @@ enum PipelineFactory {
 
         let recorder = AudioRecorderImpl(noiseSuppressor: noiseSuppressor)
         let transcriber = SpeechAnalyzerTranscriptionEngine()
-        let corrector = makeCorrector(settings: settings)
+        let corrector = makeCorrector(settings: settings, modelResolver: modelResolver)
         let inserter = TextInserterImpl(
             clipboard: NSPasteboardClipboardManager(),
             keystroke: CGEventKeystrokeSimulator(),
@@ -82,11 +83,14 @@ enum PipelineFactory {
         }.value
     }
 
-    private static func makeCorrector(settings: SettingsManager) -> TextCorrectorImpl {
+    private static func makeCorrector(settings: SettingsManager, modelResolver: ClaudeModelResolver) -> TextCorrectorImpl {
         let apiKeyProvider: @Sendable () throws -> String = { [settings] in
             try settings.resolveAPIKeySendable()
         }
-        let transport = ClaudeAPITransport.makeTransport(apiKeyProvider: apiKeyProvider)
+        let transport = ClaudeAPITransport.makeTransport(
+            apiKeyProvider: apiKeyProvider,
+            modelID: { modelResolver.modelID(for: $0) }
+        )
         return TextCorrectorImpl(
             config: CorrectionConfig(),
             transport: transport,

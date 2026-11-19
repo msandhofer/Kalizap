@@ -2,7 +2,7 @@ import Foundation
 
 public final class TextCorrectorImpl: TextCorrecting, @unchecked Sendable {
     private var config: CorrectionConfig
-    private let transport: @Sendable (String, String, Int) async throws -> String
+    private let transport: @Sendable (String, String, Int, ClaudeModelFamily) async throws -> String
     private let apiKeyProvider: @Sendable () throws -> String
     private var _lastDebugSnapshot: DebugSnapshot?
 
@@ -10,7 +10,7 @@ public final class TextCorrectorImpl: TextCorrecting, @unchecked Sendable {
 
     public init(
         config: CorrectionConfig,
-        transport: @escaping @Sendable (String, String, Int) async throws -> String,
+        transport: @escaping @Sendable (String, String, Int, ClaudeModelFamily) async throws -> String,
         apiKeyProvider: @escaping @Sendable () throws -> String
     ) {
         self.config = config
@@ -69,7 +69,7 @@ public final class TextCorrectorImpl: TextCorrecting, @unchecked Sendable {
     private func callWithTimeout(systemPrompt: String, userText: String) async throws -> String {
         try await withThrowingTaskGroup(of: String.self) { group in
             group.addTask {
-                try await self.transport(systemPrompt, userText, self.config.timeoutMs)
+                try await self.transport(systemPrompt, userText, self.config.timeoutMs, self.config.modelFamily)
             }
             group.addTask {
                 try await Task.sleep(for: .milliseconds(self.config.timeoutMs))

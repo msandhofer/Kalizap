@@ -7,6 +7,7 @@ public struct CorrectionConfig: Sendable {
     public var personalDictionary: [String] = []
     public var timeoutMs: Int = AppConstants.defaultLLMTimeoutMs
     public var maxRetries: Int = 1
+    public var modelFamily: ClaudeModelFamily = .haiku
 
     public init(
         contextMode: ContextMode = .neutral,
@@ -14,7 +15,8 @@ public struct CorrectionConfig: Sendable {
         intensity: CorrectionIntensity = .init(),
         personalDictionary: [String] = [],
         timeoutMs: Int = AppConstants.defaultLLMTimeoutMs,
-        maxRetries: Int = 1
+        maxRetries: Int = 1,
+        modelFamily: ClaudeModelFamily = .haiku
     ) {
         self.contextMode = contextMode
         self.tasks = tasks
@@ -22,6 +24,7 @@ public struct CorrectionConfig: Sendable {
         self.personalDictionary = personalDictionary
         self.timeoutMs = timeoutMs
         self.maxRetries = maxRetries
+        self.modelFamily = modelFamily
     }
 
     public init(from settings: CorrectionSettings, resolvedContextMode: ContextMode) {
@@ -34,6 +37,7 @@ public struct CorrectionConfig: Sendable {
         )
         self.personalDictionary = settings.personalDictionary
         self.timeoutMs = settings.llmTimeoutMs
+        self.modelFamily = settings.modelFamily
     }
 }
 

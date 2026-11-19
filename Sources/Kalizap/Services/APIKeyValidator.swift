@@ -14,14 +14,11 @@ public struct AnthropicAPIKeyValidator: APIKeyValidating {
     }
 
     public func validate(apiKey: String) async throws {
-        var request = URLRequest(url: AnthropicDefaults.apiURL)
-        request.httpMethod = "POST"
+        // Listing models needs a valid key but no model ID and costs no tokens.
+        var request = URLRequest(url: AnthropicDefaults.modelsURL)
+        request.httpMethod = "GET"
         request.setValue(apiKey, forHTTPHeaderField: AnthropicDefaults.Headers.apiKey)
         request.setValue(AnthropicDefaults.apiVersion, forHTTPHeaderField: AnthropicDefaults.Headers.version)
-        request.setValue(AnthropicDefaults.Headers.contentType, forHTTPHeaderField: "content-type")
-        request.httpBody = Data("""
-        {"model":"\(AnthropicDefaults.model)","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}
-        """.utf8)
 
         let (_, response) = try await session.data(for: request)
 

@@ -82,6 +82,7 @@ public struct CorrectionSettings: Codable, Equatable {
     public var personalDictionary: [String] = []
     public var llmTimeoutMs: Int = AppConstants.defaultLLMTimeoutMs
     public var showAPIKeyNotification: Bool = true
+    public var modelFamily: ClaudeModelFamily = .haiku
 
     public var taskGrammar: Bool = true
     public var taskFillerRemoval: Bool = true
@@ -135,6 +136,7 @@ public struct CorrectionSettings: Codable, Equatable {
         personalDictionary = try container.decodeIfPresent([String].self, forKey: .personalDictionary) ?? []
         llmTimeoutMs = try container.decodeIfPresent(Int.self, forKey: .llmTimeoutMs) ?? AppConstants.defaultLLMTimeoutMs
         showAPIKeyNotification = try container.decodeIfPresent(Bool.self, forKey: .showAPIKeyNotification) ?? true
+        modelFamily = try container.decodeIfPresent(ClaudeModelFamily.self, forKey: .modelFamily) ?? .haiku
         taskGrammar = try container.decodeIfPresent(Bool.self, forKey: .taskGrammar) ?? true
         taskFillerRemoval = try container.decodeIfPresent(Bool.self, forKey: .taskFillerRemoval) ?? true
         taskWrittenLanguage = try container.decodeIfPresent(Bool.self, forKey: .taskWrittenLanguage) ?? true
