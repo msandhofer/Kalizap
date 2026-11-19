@@ -11,10 +11,13 @@ Kalizap is a personal experiment in *vibecoding*: every line of code in this pro
 ### Homebrew Cask (recommended)
 
 ```
+brew trust --cask msandhofer/kalizap/kalizap
 brew install --cask msandhofer/kalizap/kalizap
 ```
 
-> The Homebrew tap is still in preparation (see Issue #45). Until then, please use Direct Download.
+Recent Homebrew versions refuse to load casks from third-party taps until you trust them explicitly. The first command trusts only the Kalizap cask, not the whole tap.
+
+Updates: `brew upgrade --cask kalizap`
 
 ### Direct Download (GitHub Releases)
 

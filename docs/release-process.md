@@ -140,8 +140,11 @@ Auf einem zweiten Rechner (oder nach `brew uninstall --cask kalizap`):
 
 ```bash
 brew tap msandhofer/kalizap
+brew trust --cask msandhofer/kalizap/kalizap
 brew install --cask kalizap
 ```
+
+Hinweis: Neuere Homebrew-Versionen (beobachtet mit 7.0.15) laden Casks aus Fremd-Taps erst nach `brew trust`. Ohne diesen Schritt bricht die Installation mit `Refusing to load cask … from untrusted tap` ab.
 
 Erwartetes Ergebnis: App wird in `/Applications/Kalizap.app` installiert, Quarantäne-Flag automatisch entfernt, App startet ohne Gatekeeper-Prompt.
 
