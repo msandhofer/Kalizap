@@ -13,20 +13,22 @@ struct KalizapApp: App {
             apiKeyValidator: AnthropicAPIKeyValidator(),
             launchAtLogin: LaunchAtLoginService()
         )
-        let container = try! ModelContainer(
-            for: DictationRecord.self,
-            migrationPlan: DictationMigrationPlan.self
+        let container = DictationContainerFactory.makeContainer(
+            storeURL: Self.supportDirectory.appendingPathComponent("Dictations.store")
         )
         let store: any DictationStoring = DictationStoreImpl(modelContainer: container)
         _appState = State(initialValue: AppState(settings: settings, store: store))
         FileLog.log("App.init completed — language=\(settings.audio.language.rawValue)")
     }
 
+    private static var supportDirectory: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("Kalizap", isDirectory: true)
+    }
+
     private static func makeCredentialStore() -> EncryptedCredentialStore {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let baseDir = appSupport.appendingPathComponent("Kalizap", isDirectory: true)
-        return EncryptedCredentialStore(
-            baseDirectory: baseDir,
+        EncryptedCredentialStore(
+            baseDirectory: supportDirectory,
             identity: ProductionHardwareIdentity(),
             appSecret: AppSecret.bytes
         )
