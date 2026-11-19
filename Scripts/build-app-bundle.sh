@@ -27,7 +27,8 @@ echo ""
 echo "Step 1/5: swift build -c release --product KalizapApp"
 swift build -c release --product KalizapApp
 
-BUILD_DIR=".build/arm64-apple-macosx/release"
+# Bin-Pfad von SwiftPM erfragen statt hartkodieren (aendert sich je nach Build-System/Toolchain)
+BUILD_DIR="$(swift build -c release --product KalizapApp --show-bin-path)"
 EXEC="$BUILD_DIR/KalizapApp"
 RESOURCE_BUNDLE="$BUILD_DIR/Kalizap_KalizapApp.bundle"
 
